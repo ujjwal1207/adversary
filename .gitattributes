@@ -1,0 +1,18 @@
+# Normalise to LF in the working tree on every platform.
+#
+# This is a determinism requirement, not a style preference. Scenario content
+# hashes are computed over payload text (docs/ARCHITECTURE.md 9.5), and an
+# attack payload written as a YAML block scalar carries its line endings into
+# that text. If Windows checked out CRLF and Linux checked out LF, the same
+# scenario would hash differently on the two platforms and no scorecard would
+# be reproducible across them.
+#
+# The loader normalises line endings when hashing as well - belt and braces,
+# because a file arriving by some route other than git checkout should not be
+# able to move a hash either.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.sqlite binary
+pnpm-lock.yaml linguist-generated=true
