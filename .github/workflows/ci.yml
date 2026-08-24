@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A queued run of an old commit tells you nothing useful.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Deliberately absent: ANTHROPIC_API_KEY, OPENAI_API_KEY, and any payment
+  # provider credential. The whole corpus must run with no model access and no
+  # network - that is what ScriptedAgent is for, and it is why the determinism
+  # check can be a required status check rather than a nightly job.
+  CI: 'true'
+
+jobs:
+  verify:
+    name: verify (sqlite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.11.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: typecheck
+        run: pnpm typecheck
+
+      - name: lint
+        run: pnpm lint
+
+      - name: build
+        run: pnpm build
+
+      - name: test
+        run: pnpm test
+
+      - name: migrate (sqlite)
+        run: pnpm db:migrate --fresh
+
+      # Phase 1 gate, checked rather than asserted. `db:migrate` exits non-zero
+      # unless exactly the five tables of the data model exist.
+      - name: migrate is idempotent
+        run: pnpm db:migrate
+
+  postgres:
+    name: verify (postgres)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: adversary
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      ADVERSARY_DB_DIALECT: postgres
+      ADVERSARY_PG_URL: postgres://postgres:postgres@localhost:5432/adversary
+      # Turns on the Postgres half of migrate.test.ts, which is skipped by
+      # default so that `pnpm test` works with no services running.
+      ADVERSARY_TEST_PG_URL: postgres://postgres:postgres@localhost:5432/adversary
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.11.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: migrate (postgres)
+        run: pnpm db:migrate --fresh
+
+      - name: migrate is idempotent
+        run: pnpm db:migrate
+
+      - name: test against postgres
+        run: pnpm test
+
+  # The dependency rule is the guarantee everything else rests on, so it gets
+  # its own job: a red X here should be unmistakable, not buried in a test log.
+  boundary:
+    name: agents cannot reach rails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.11.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: layer 1 - @adversary/rails must not resolve from packages/agents
+        working-directory: packages/agents
+        run: |
+          if node -e "import('@adversary/rails')" 2>/dev/null; then
+            echo "::error::@adversary/rails resolved from packages/agents. The"
+            echo "::error::interceptor guarantee in docs/ARCHITECTURE.md 4 is broken."
+            exit 1
+          fi
+          echo "@adversary/rails is not resolvable from packages/agents - correct."
+
+      - name: layers 2 and 3 - lint rule and import graph
+        run: pnpm vitest run tests/boundary.test.ts

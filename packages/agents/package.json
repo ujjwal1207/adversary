@@ -1,0 +1,14 @@
+{
+  "name": "@adversary/agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SUT adapter interface and reference agents. May not import @adversary/rails.",
+  "sideEffects": false,
+  "files": ["dist"],
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": { "@adversary/core": "workspace:*" }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@adversary/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "adversary run | report | replay | list-scenarios | verify-determinism",
+  "bin": { "adversary": "./dist/index.js" },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@adversary/agents": "workspace:*",
+    "@adversary/core": "workspace:*",
+    "@adversary/gate": "workspace:*",
+    "@adversary/rails": "workspace:*",
+    "@adversary/report": "workspace:*",
+    "@adversary/runner": "workspace:*",
+    "commander": "^13.0.0"
+  }
+}

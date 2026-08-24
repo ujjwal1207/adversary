@@ -1,0 +1,14 @@
+{
+  "name": "@adversary/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Domain layer: types, ledger, invariant evaluator, taint, metrics. No I/O, no network, no model client.",
+  "sideEffects": false,
+  "files": ["dist"],
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }, "./contracts": { "types": "./dist/contracts.d.ts", "import": "./dist/contracts.js" } },
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {}
+}

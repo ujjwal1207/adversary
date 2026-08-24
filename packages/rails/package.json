@@ -1,0 +1,14 @@
+{
+  "name": "@adversary/rails",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Rail interface, mock rail, live-test rail.",
+  "sideEffects": false,
+  "files": ["dist"],
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": { "@adversary/core": "workspace:*" }
+}

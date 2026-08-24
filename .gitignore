@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.local
+*.sqlite
+*.sqlite-journal
+*.db
+out/
+report.html
+.cassettes/

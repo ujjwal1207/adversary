@@ -1,0 +1,14 @@
+{
+  "name": "@adversary/gate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic policy engine. The defence under test.",
+  "sideEffects": false,
+  "files": ["dist"],
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": { "@adversary/core": "workspace:*" }
+}
