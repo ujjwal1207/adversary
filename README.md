@@ -26,7 +26,7 @@ phase-to-architecture map.
 | Phase | | |
 |---|---|---|
 | 1 | Scaffold | **done** |
-| 2 | Ledger and types | not started |
+| 2 | Ledger and types | **done** |
 | 3 | Invariant evaluator | not started |
 | 4 | Mock rail and interceptor | not started |
 | 5 | Reference agents | not started |

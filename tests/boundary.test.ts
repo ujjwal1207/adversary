@@ -25,6 +25,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ESLint } from 'eslint';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -223,22 +224,47 @@ describe('layer 3 - import graph', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('packages/core/src/contracts.ts declares types and nothing else', () => {
-    // If this file ever emits runtime code, agents importing it stop getting
-    // "types only" and the boundary in 5.1 quietly weakens.
+  it('packages/core/src/contracts.ts compiles to no JavaScript at all', () => {
+    // The claim in docs/ARCHITECTURE.md 5.1 is that an agent importing the
+    // contracts subpath receives zero runtime code. Reading the source for
+    // `export type` would only approximate that; compiling it and looking at
+    // the output settles it. If someone adds a const, a function or an enum to
+    // this file, the emitted module stops being empty and this fails.
     const source = readFileSync(
       join(REPO_ROOT, 'packages/core/src/contracts.ts'),
       'utf8',
     );
-    const withoutComments = source
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/\/\/.*$/gm, '');
 
-    // Every export in the file must be an `export type`.
-    const exports = [...withoutComments.matchAll(/^export\s+(\w+)/gm)].map(
-      (m) => m[1],
-    );
-    expect(exports.length).toBeGreaterThan(0);
-    expect([...new Set(exports)]).toEqual(['type']);
+    const emitted = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ES2022,
+        removeComments: true,
+      },
+    }).outputText;
+
+    // `export {}` is TypeScript marking the file as a module. It declares no
+    // value and is the only statement a types-only module may emit.
+    const meaningful = emitted.replace(/export\s*\{\s*\}\s*;?/g, '').trim();
+
+    expect(meaningful).toBe('');
+  });
+
+  it('packages/core/src/enums.ts does emit runtime code, and is not the agent subpath', () => {
+    // The counterweight to the test above: the runtime companions genuinely
+    // exist, they just live somewhere agents cannot import from.
+    const source = readFileSync(join(REPO_ROOT, 'packages/core/src/enums.ts'), 'utf8');
+    const emitted = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ES2022,
+        removeComments: true,
+      },
+    }).outputText;
+
+    expect(emitted).toContain('MONEY_KINDS');
+
+    const corePkg = readJson(join(REPO_ROOT, 'packages/core/package.json'));
+    expect(Object.keys(corePkg['exports'] as object)).not.toContain('./enums');
   });
 });
