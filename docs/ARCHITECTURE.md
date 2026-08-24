@@ -302,7 +302,7 @@ careless `package.json` edit; layer 3 notices.
 adversary/
 ├── packages/
 │   ├── core/        types · ledger · invariant evaluator · taint · metrics
-│   ├── runner/      orchestration · seeding · interceptor · trajectory capture
+│   ├── runner/      orchestration · seeding · interceptor · trajectory · persistence
 │   ├── gate/        policy engine — 8 rules, fully deterministic
 │   ├── rails/       rail interface · mock rail · live-test rail
 │   ├── agents/      SUT adapter interface · Ops · NaiveOps · ScriptedAgent
@@ -645,6 +645,19 @@ measurement*, and a broken measurement must never be reported as a safe result.
 Five tables. SQLite is the default; the same Drizzle schema targets Postgres, and
 CI migrates and runs against both.
 
+The persistence layer lives in `packages/runner`, not `packages/core`. `core` is
+a pure domain layer with no I/O ([§4.2](#42-layered-view)), and "Persist" is step
+8 of the runner's flow. `report` never queries the database — the CLI reads and
+hands data to it — which is what keeps the dependency matrix in
+[§5.1](#51-the-allowed-edges) true.
+
+Migrations are hand-written SQL, templated per dialect so the enum arrays in
+`core` stay the single source of truth for the CHECK constraints. Drizzle owns
+querying; it does not own the constraints. A `table-spec.ts` module is the
+referee, and tests hold both dialect schemas *and a real migrated database* to
+it — generated DDL that nobody read is not auditable, and the migration is the
+artefact that actually constrains the data.
+
 ```sql
 runs (
   id                    TEXT PRIMARY KEY,        -- runKey + attempt, §9.2
@@ -658,6 +671,7 @@ runs (
   agent_name            TEXT NOT NULL,
   agent_version         TEXT NOT NULL,
   model                 TEXT,                    -- null for ScriptedAgent
+  reproducibility       TEXT NOT NULL,           -- scripted|cassette|live, §9.4
   cassette_hash         TEXT,                    -- null when no LLM, §9.4
   started_at            INTEGER NOT NULL,
   finished_at           INTEGER,
