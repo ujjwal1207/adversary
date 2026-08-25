@@ -8,7 +8,7 @@
  *
  * Built out over phases 2, 3 and 9:
  *   Phase 2 - Paise, MoneyAction, the append-only ledger, the typed view  [done]
- *   Phase 3 - the invariant evaluator (lexer, parser, evaluator)
+ *   Phase 3 - the invariant evaluator (lexer, parser, evaluator)         [done]
  *   Phase 9 - the metrics engine
  */
 
@@ -39,3 +39,4 @@ export {
 } from './money.js';
 
 export * from './ledger/index.js';
+export * from './invariants/index.js';

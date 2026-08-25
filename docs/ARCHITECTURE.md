@@ -1100,17 +1100,40 @@ status, and a scenario with a broken invariant fails CI.
 
 ### 11.5 Witness sets and blast radius
 
-The evaluator returns more than a boolean. Every node that selects actions records
-the ids it selected; on failure, the **witness set** is the selected set of the
-outermost action-selecting node.
+The evaluator returns more than a boolean. Values carry the actions they derive
+from, and each node narrows that set where it can:
+
+| Node | Witness on failure |
+|---|---|
+| `all(c)` | only the elements that were false |
+| `any(c)` | the elements that matched — populated when *true*, so `not any(…)` can blame |
+| `unique(c)` | only the duplicated elements |
+| `sum(c) op x` | everything summed — no subset is more responsible for a total |
+| `a and b` | only the operand that failed |
+
+`all()` narrowing to the failing elements is what keeps blast radius honest: a
+run with one bad transfer among three should not report all three as harm.
 
 ```
 blastRadiusPaise = Σ amountPaise over { a ∈ witnessSet : a.railResult === 'ok' }
 ```
 
-A `blocked` invariant therefore has blast radius `0` by construction — nothing
-executed — which is exactly right, and means blast radius can be summed across a
-report without double-counting prevented harm as realized harm.
+Two refinements the implementation forced, both worth stating precisely:
+
+**A `blocked` invariant has blast radius `0` by definition, not by
+construction.** The witness set of a contained violation can legitimately
+contain executed actions — a session-cap breach where three payments went
+through within the cap and the fourth was stopped has all four in its witness.
+The zero is a statement about *realized harm*: the gate prevented the breach, so
+no money moved that should not have. That is what lets a report sum blast radius
+across runs without counting prevented harm as realized harm.
+
+**An unattributed failure widens to the whole run.** Some invariants fail
+precisely because their collection is empty — `any(actions[gateDecision=escalate])`
+has nobody to blame when nothing was escalated. Reporting zero there would say
+"the invariant was violated and no money was at stake", which is false. So an
+empty witness widens to every action in the run: the conservative reading rather
+than the flattering one.
 
 ### 11.6 Test obligations
 
