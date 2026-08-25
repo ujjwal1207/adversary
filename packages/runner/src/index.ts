@@ -5,8 +5,9 @@
  * rails and agents at once. It owns the nine-step run flow, seeding, the
  * interceptor, trajectory capture and persistence.
  *
- * Phase 4 - the interceptor and idempotency store
+ * Phase 4 - the interceptor and idempotency store  [done]
  * Phase 6 - the nine-step flow, the seed tree, replay, verify-determinism
  */
 
 export * from './db/index.js';
+export * from './interceptor/index.js';

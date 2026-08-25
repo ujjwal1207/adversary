@@ -13,8 +13,8 @@
  *   Layer 3  import graph - no module under packages/agents/src names rails,
  *            directly or through a re-export
  *
- * Layer 4 (the frozen InterceptedTools object) arrives with the interceptor in
- * Phase 4 and is tested there.
+ * Layer 4 (the frozen, null-prototype InterceptedTools object) is tested where
+ * it is built: packages/runner/src/interceptor/__tests__/interceptor.test.ts.
  *
  * These are workspace-level invariants rather than package-level ones, which is
  * why they live in /tests instead of inside a package.

@@ -460,12 +460,24 @@ agent calls tool
   → resolve idempotency key            → explicit from agent, else auto (§6.4.1)
   → attach taint                       → match params against the taint index (§10)
   → build MoneyAction draft
-  → idempotency store check            → replay? return prior result, do NOT execute
   → gate (if enabled)                  → block/escalate? record, return refusal
+  → idempotency store check            → replay? record, return prior, do NOT execute
   → rail.execute()                     → capture result or error
   → ledger.append()                    → assigns seq, freezes
   → return realistic result to agent
 ```
+
+**The gate runs before the idempotency check** ([§17 A9](#17-deviations-and-additions)).
+The gate's `retry_limit` and `velocity` rules exist precisely to catch "keep
+trying" behaviour, and a retry carrying the same key is still a retry. Checking
+idempotency first would hide exactly the attempts corpus family E is about, and
+would let a blocked action poison a key a later legitimate action needed.
+
+**A deduplicated attempt is still recorded**, with `railResult: 'not_executed'`
+and `railError: 'idempotent_replay'`. The retry invariants count attempts, so an
+agent that hammered one mandate forty times behind a single key must not read as
+an agent that tried once. `not_executed` keeps it out of every sum over money
+that actually moved.
 
 The refusal returned on a block must look like something a real payment API could
 return — a structured error with a code, a message and a hint that a human approval
@@ -1408,6 +1420,29 @@ machine load ([§9.3](#93-the-virtual-clock)).
 
 Blast radius is unauditable without knowing which actions produced it
 ([§11.5](#115-witness-sets-and-blast-radius)).
+
+### A9 — The gate runs before the idempotency check (refinement)
+
+**Spec, and an earlier draft of this document:** the interceptor flow listed the
+idempotency check before the gate.
+
+**Issue:** two problems, both of which weaken measurement.
+
+The gate's `retry_limit` and `velocity` rules exist to catch an agent that keeps
+trying. If the idempotency store short-circuits first, a forty-attempt retry loop
+behind one key reaches the gate once — and corpus family E, whose entire subject
+is stop-rule violations, becomes unfailable. Second, a *blocked* action would
+claim its idempotency key on the way through, so a later legitimate action
+reusing that key would be deduplicated against something that never executed.
+
+**Resolution:** gate first, then idempotency. A replay is recorded as a ledger
+row with `railResult: 'not_executed'` and `railError: 'idempotent_replay'`, so
+attempts stay countable while money is counted once. A blocked action never
+reaches the store.
+
+This also keeps `gateDecision` truthful on every row: the gate really did
+evaluate every attempt, so no row has to invent a decision for a call the gate
+never saw.
 
 ---
 

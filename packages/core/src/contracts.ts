@@ -286,3 +286,107 @@ export interface TrajectoryEvent {
   readonly kind: TrajectoryEventKind;
   readonly content: Readonly<Record<string, unknown>>;
 }
+
+// ===========================================================================
+// Phase 4 - the tool surface the agent under test is handed
+// ===========================================================================
+
+/**
+ * What a tool hands back to the agent.
+ *
+ * Shaped like a payment API response, not like a harness result. On a gate
+ * block the agent must see something it can reason about and respond to by
+ * escalating; if a block looked like an internal error, the scenario would stop
+ * measuring the agent's judgment and start measuring its error handling
+ * (docs/ARCHITECTURE.md 6.4).
+ */
+export type ToolResult =
+  | {
+      readonly ok: true;
+      readonly id: string;
+      readonly status: string;
+      readonly request_id: string;
+    }
+  | {
+      readonly ok: false;
+      readonly error: {
+        readonly code: string;
+        readonly description: string;
+        readonly resolution?: string;
+      };
+      readonly request_id: string;
+    };
+
+/**
+ * Amounts arrive from the agent as plain numbers, not as `Paise`.
+ *
+ * That is the correct boundary: an agent cannot construct a `Paise` because it
+ * cannot reach `paise()`, so every amount crossing into the harness is
+ * validated at the interceptor rather than trusted because it was typed.
+ *
+ * `idempotencyKey` is optional on purpose. Omitting it means no deduplication,
+ * exactly as a real payment API behaves - which is what makes corpus family D
+ * able to fail.
+ */
+export interface MoneyToolArgs {
+  readonly amountPaise: number;
+  readonly rationale: string;
+  readonly idempotencyKey?: string;
+}
+
+export interface PayVendorArgs extends MoneyToolArgs {
+  readonly vendorId: string;
+}
+
+export interface CreatePaymentLinkArgs extends MoneyToolArgs {
+  readonly customerId: string;
+}
+
+export interface IssueRefundArgs extends MoneyToolArgs {
+  readonly paymentId: string;
+}
+
+export interface RetrySubscriptionChargeArgs {
+  readonly subId: string;
+  readonly amountPaise: number;
+  readonly rationale: string;
+  readonly idempotencyKey?: string;
+}
+
+/**
+ * The complete tool surface, and the only path from an agent to money.
+ *
+ * The object an agent receives is deep-frozen and every member is a closure
+ * created inside the runner, so there is no rail client on any prototype chain
+ * for a `constructor` walk to reach. That is layer 4 of the dependency rule
+ * (docs/ARCHITECTURE.md 5.2).
+ */
+export interface InterceptedTools {
+  /** Untrusted surface. */
+  list_invoices(): Promise<readonly Readonly<Record<string, unknown>>[]>;
+  /** Untrusted surface. */
+  read_tickets(): Promise<readonly Readonly<Record<string, unknown>>[]>;
+  /** Untrusted surface. */
+  read_vendor_note(vendorId: string): Promise<string>;
+
+  pay_vendor(args: PayVendorArgs): Promise<ToolResult>;
+  create_payment_link(args: CreatePaymentLinkArgs): Promise<ToolResult>;
+  issue_refund(args: IssueRefundArgs): Promise<ToolResult>;
+  retry_subscription_charge(args: RetrySubscriptionChargeArgs): Promise<ToolResult>;
+
+  /** The safe exit. */
+  escalate_to_human(args: { readonly reason: string }): Promise<ToolResult>;
+}
+
+/**
+ * Where the read tools get their content.
+ *
+ * Phase 8 supplies the corpus fixtures. Phase 7 wraps these reads so that
+ * attacker-controllable content is scanned and indexed for taint - which is why
+ * the interceptor mediates every tool, not only the ones that move money.
+ */
+export interface ToolDataSource {
+  listInvoices(): Promise<readonly Readonly<Record<string, unknown>>[]>;
+  readTickets(): Promise<readonly Readonly<Record<string, unknown>>[]>;
+  readVendorNote(vendorId: string): Promise<string>;
+}
