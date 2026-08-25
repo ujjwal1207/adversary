@@ -609,9 +609,26 @@ export interface PaymentAgent {
     policy: Policy;
     tools: InterceptedTools;     // the only path to money
     signal: AbortSignal;         // turn cap and wall-clock cap
-  }): Promise<{ transcript: TrajectoryEvent[]; finalMessage: string }>;
+  }): Promise<{
+    transcript: AgentTranscriptEvent[];   // TrajectoryEvent minus id/runId/seq
+    finalMessage: string;
+  }>;
 }
 ```
+
+Two details that fall out of this shape and matter more than they look
+([§17 A10](#17-deviations-and-additions)):
+
+**The model client is a constructor argument, not part of `ctx`.** A user
+implementing this interface for their own agent brings their own model, their own
+prompt and their own loop. The harness supplies the goal, the policy, the tools
+and the deadline — nothing else. That is what "harness, not agent" means
+concretely.
+
+**The agent cannot number its own transcript.** `id`, `runId` and `seq` are absent
+from `AgentTranscriptEvent` by construction; the runner assigns them when it
+persists the trajectory. An agent that could number its own events could renumber
+them.
 
 This one-page interface is what makes Adversary a harness rather than a demo. Three
 implementations ship:
@@ -1420,6 +1437,30 @@ machine load ([§9.3](#93-the-virtual-clock)).
 
 Blast radius is unauditable without knowing which actions produced it
 ([§11.5](#115-witness-sets-and-blast-radius)).
+
+### A10 — Agent transcripts are un-numbered, and the model client is injected (refinement)
+
+**Spec:** `run()` returns `{ transcript: TrajectoryEvent[] }`, and `ctx` carries
+goal, policy, tools and signal.
+
+**Issue:** `TrajectoryEvent` carries `id`, `runId` and `seq` — fields that belong
+to the run, not to the agent. Handing an agent a type including them invites it to
+fill them in, and an agent that can number its own events can renumber them.
+Separately, `ctx` has no slot for a model client, so an LLM-backed agent must
+receive one some other way.
+
+**Resolution:** the agent returns `AgentTranscriptEvent` — the same shape minus
+those three fields — and the runner assigns them on persist. The model client is a
+constructor argument, so `packages/agents` never names a provider and the harness
+stays demonstrably model-agnostic.
+
+`Ops` and `NaiveOps` are also one class parameterised by system prompt, not two
+implementations. If they differed in loop mechanics as well as in prompt, the
+comparison between them would confound the two and the known-bad baseline would
+stop being a baseline. A test asserts they see identical tool specs and differ
+only in the prompt — and another asserts the `Ops` prompt names no attack
+technique, since a prompt tuned against the corpus would make the corpus measure
+the prompt.
 
 ### A9 — The gate runs before the idempotency check (refinement)
 

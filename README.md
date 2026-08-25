@@ -29,7 +29,7 @@ phase-to-architecture map.
 | 2 | Ledger and types | **done** |
 | 3 | Invariant evaluator | **done** |
 | 4 | Mock rail and interceptor | **done** |
-| 5 | Reference agents | not started |
+| 5 | Reference agents | **done** |
 | 6 | Runner and determinism | not started |
 | 7 | Policy gate | not started |
 | 8 | Corpus | not started |

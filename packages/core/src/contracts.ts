@@ -390,3 +390,99 @@ export interface ToolDataSource {
   readTickets(): Promise<readonly Readonly<Record<string, unknown>>[]>;
   readVendorNote(vendorId: string): Promise<string>;
 }
+
+// ===========================================================================
+// Phase 5 - the SUT adapter
+// ===========================================================================
+
+/**
+ * One entry in an agent's own transcript.
+ *
+ * `id`, `runId` and `seq` are absent by construction: they belong to the run,
+ * and the runner assigns them when it persists the trajectory. An agent that
+ * could number its own events could renumber them.
+ */
+export type AgentTranscriptEvent = Omit<TrajectoryEvent, 'id' | 'runId' | 'seq'>;
+
+export interface AgentContext {
+  readonly goal: string;
+  readonly policy: Policy;
+  /** The only path to money. */
+  readonly tools: InterceptedTools;
+  /** Fires on the turn cap or the wall-clock cap. */
+  readonly signal: AbortSignal;
+}
+
+export interface AgentRunResult {
+  readonly transcript: readonly AgentTranscriptEvent[];
+  readonly finalMessage: string;
+}
+
+/**
+ * The system under test.
+ *
+ * This one-page interface is what makes Adversary a harness rather than a demo:
+ * a platform engineer implements it once and runs the whole corpus against
+ * their own agent. Nothing else in the system needs to know what is behind it.
+ */
+export interface PaymentAgent {
+  readonly name: string;
+  readonly version: string;
+  run(ctx: AgentContext): Promise<AgentRunResult>;
+}
+
+// --- The model client ------------------------------------------------------
+//
+// Declared here, implemented in the runner. The harness must be demonstrably
+// model-agnostic, so no agent ever names a provider - it is handed a client.
+
+export interface LlmToolCall {
+  readonly id: string;
+  readonly name: string;
+  readonly args: Readonly<Record<string, unknown>>;
+}
+
+export interface LlmMessage {
+  readonly role: 'user' | 'assistant' | 'tool';
+  readonly content: string;
+  readonly toolCalls?: readonly LlmToolCall[];
+  /** Set on a `tool` message, naming the call it answers. */
+  readonly toolCallId?: string;
+}
+
+export interface LlmToolSpec {
+  readonly name: string;
+  readonly description: string;
+  /** JSON Schema for the arguments. */
+  readonly parameters: Readonly<Record<string, unknown>>;
+}
+
+export interface LlmRequest {
+  readonly system: string;
+  readonly messages: readonly LlmMessage[];
+  readonly tools: readonly LlmToolSpec[];
+  /**
+   * Pinned to 0 by the runner.
+   *
+   * Note this reduces variation; it does not eliminate it. A hosted model is
+   * not deterministic even at temperature 0 - batching and provider-side
+   * updates both break identity - which is why reproducibility is reported as a
+   * tier rather than asserted (docs/ARCHITECTURE.md 9.4).
+   */
+  readonly temperature: number;
+  readonly maxTokens: number;
+  readonly signal?: AbortSignal;
+}
+
+export type LlmStopReason = 'end_turn' | 'tool_use' | 'max_tokens' | 'aborted';
+
+export interface LlmCompletion {
+  readonly text: string;
+  readonly toolCalls: readonly LlmToolCall[];
+  readonly stopReason: LlmStopReason;
+}
+
+export interface LlmClient {
+  readonly model: string;
+  complete(request: LlmRequest): Promise<LlmCompletion>;
+}

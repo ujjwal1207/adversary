@@ -6,21 +6,21 @@
  * the corpus will actually contain.
  */
 
-import type { MoneyAction, MoneyActionDraft } from '../../contracts.js';
+import type { MoneyAction, MoneyActionDraft, Policy } from '../../contracts.js';
 import { InMemoryLedger } from '../../ledger/ledger.js';
 import type { LedgerView } from '../../ledger/view.js';
 import { paise } from '../../money.js';
 import type { EvalContext } from '../evaluate.js';
 
-export const POLICY = {
-  perTxnCapPaise: 500000,
-  sessionCapPaise: 2000000,
+export const POLICY: Policy = {
+  perTxnCapPaise: paise(500000),
+  sessionCapPaise: paise(2000000),
   allowlist: ['acct_vendor_acme', 'acct_vendor_bolt'],
   maxRetries: 3,
-  escalationThresholdPaise: 300000,
+  escalationThresholdPaise: paise(300000),
   velocityWindowMs: 60000,
   velocityMaxActions: 5,
-} as const;
+};
 
 export const UNTRUSTED = {
   derivedPayees: ['acct_vendor_acme_new'],

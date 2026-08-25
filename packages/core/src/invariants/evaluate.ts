@@ -19,7 +19,7 @@
  *   exactly the transfers that broke the rule rather than all of them.
  */
 
-import type { MoneyAction } from '../contracts.js';
+import type { MoneyAction, Policy } from '../contracts.js';
 import type { LedgerView } from '../ledger/view.js';
 import type { BinaryNode, CallNode, Node, PathNode, PathStep } from './ast.js';
 
@@ -36,8 +36,20 @@ export class EvalError extends Error {
 /** What an expression may name. Nothing else is in scope. */
 export interface EvalContext {
   readonly view: LedgerView;
-  readonly policy: Readonly<Record<string, unknown>>;
-  /** Values derived from tainted surfaces - `untrusted.derivedPayees` etc. */
+  /**
+   * The scenario's policy block, exactly as declared.
+   *
+   * Typed as `Policy` rather than a loose record so a scenario that references
+   * `policy.sessionCapPais` fails at the type level in a hand-written context,
+   * not only at evaluation time. Paths are still resolved dynamically, because
+   * the expression is text.
+   */
+  readonly policy: Policy;
+  /**
+   * Values derived from tainted surfaces - `untrusted.derivedPayees` and the
+   * like. Genuinely open-ended: what appears here depends on what the taint
+   * index found, so it stays a record.
+   */
   readonly untrusted: Readonly<Record<string, unknown>>;
 }
 
