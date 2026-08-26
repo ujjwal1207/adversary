@@ -20,6 +20,8 @@ export interface DbHandle {
   readonly dialect: DbConfig['dialect'];
   readonly describe: string;
   exec(sql: string): Promise<void>;
+  /** Parameterised write. Placeholders differ by dialect - see `placeholder`. */
+  run(sql: string, params?: unknown[]): Promise<void>;
   all<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]>;
   transaction<T>(fn: () => Promise<T>): Promise<T>;
   close(): Promise<void>;
@@ -47,8 +49,11 @@ async function openSqlite(
     async exec(sql) {
       raw.exec(sql);
     },
+    async run(sql: string, params: unknown[] = []) {
+      raw.prepare(sql).run(...(params as never[]));
+    },
     async all<T>(sql: string, params: unknown[] = []) {
-      return raw.prepare(sql).all(...params) as T[];
+      return raw.prepare(sql).all(...(params as never[])) as T[];
     },
     async transaction<T>(fn: () => Promise<T>) {
       // better-sqlite3's own `transaction()` helper is synchronous and cannot
@@ -82,6 +87,9 @@ async function openPostgres(
     describe: `postgres:${redactUrl(config.url)}`,
     async exec(sql) {
       await client.query(sql);
+    },
+    async run(sql: string, params: unknown[] = []) {
+      await client.query(sql, params);
     },
     async all<T>(sql: string, params: unknown[] = []) {
       const res = await client.query(sql, params);

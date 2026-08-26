@@ -134,3 +134,32 @@ jobs:
 
       - name: layers 2 and 3 - lint rule and import graph
         run: pnpm vitest run tests/boundary.test.ts
+
+  # The determinism gate. The build spec calls it non-negotiable, so it gets its
+  # own job: a red X here should be unmistakable, not buried in a test log.
+  #
+  # It runs with no API key, against ScriptedAgent, which is the only system
+  # under test that can be held to byte-identity. Live-model runs are reported
+  # as measured drift instead - see docs/ARCHITECTURE.md 9.4.
+  determinism:
+    name: same seed twice, identical ledgers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.11.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: verify determinism across the corpus
+        run: pnpm vitest run packages/runner/src/run
+
+      - name: scenario corpus loads and is coherent
+        run: pnpm vitest run packages/runner/src/scenario

@@ -895,12 +895,20 @@ runId  = `${runKey}:${attempt}`
 
 `runKey` identifies *the experiment*. `runId` identifies *this execution of it*.
 
-**Every determinism-bearing derivation uses `runKey`.** Mock-rail ids are
-`hash(runKey, seq, kind)`; auto idempotency keys are `auto:{runKey}:{seq}`; the RNG
-tree roots at `runKey`. If any of these used `runId`, the second attempt would
-produce different identifiers and the determinism check would fail for a reason that
-has nothing to do with the system's behaviour. This is a small decision that is easy
-to get wrong and expensive to debug later.
+**Derivations that determine behaviour use `runKey`.** Mock-rail references are
+`hash(runKey, seq, kind)`; auto idempotency keys are `auto:{runKey}:{seq}`; the
+RNG tree roots at the seed and scenario id. If any of these used `runId`, the
+second attempt would produce different identifiers and the determinism check
+would fail for a reason that has nothing to do with the system's behaviour.
+
+**Derivations that establish row identity use `runId`.** A money action's `id`
+and a trajectory event's `id` carry the attempt, so two attempts at one
+experiment can coexist in the database instead of colliding on the primary key.
+
+The distinction is easy to get wrong in either direction, and I got it wrong the
+first time in this direction ([§17 A12](#17-deviations-and-additions)). It is
+safe only because the ledger digest excludes `id` and `runId` — identity is
+bookkeeping, behaviour is what is compared.
 
 ### 9.3 The virtual clock
 
@@ -1437,6 +1445,43 @@ machine load ([§9.3](#93-the-virtual-clock)).
 
 Blast radius is unauditable without knowing which actions produced it
 ([§11.5](#115-witness-sets-and-blast-radius)).
+
+### A12 — Determinism-bearing derivations key off `runKey`; row identity does not (correction)
+
+**Earlier in this document ([§9.2](#92-runkey-versus-runid)):** "every
+determinism-bearing derivation uses `runKey`."
+
+**Issue found while building:** I applied that to *row ids* as well, deriving a
+money action's `id` from `hash(runKey, seq)`. Two attempts at the same
+experiment then minted identical ids and collided on the primary key the moment
+both were persisted. The determinism test caught it.
+
+**Resolution:** the rule is narrower than I first wrote it. Things that
+determine *behaviour* — rail references, auto idempotency keys, the RNG tree —
+key off `runKey`, so two attempts behave identically. Things that establish *row
+identity* key off `runId`, so two attempts can coexist in the database. This is
+safe precisely because the ledger digest excludes `id` and `runId`
+([§9.5](#95-content-hashing-and-digests)): identity is bookkeeping, not
+behaviour.
+
+The same correction applies to the verdict digest, which recorded witness
+**action ids**. Those are now attempt-scoped, so the digest records witness
+**seqs** instead — the same actions, named by something stable across attempts.
+
+### A11 — Scenarios carry the scripted agent's steps (addition)
+
+**Spec:** `ScriptedAgent` "replays a fixed tool-call sequence"; the scenario
+schema in Part 7 has no field for one.
+
+**Issue:** the sequence has to come from somewhere. CI runs the scripted corpus
+on every push, and the determinism gate needs a system under test with no source
+of variation at all — so the steps belong to the scenario, next to the payload
+they respond to.
+
+**Resolution:** an optional `script:` block, validated by the same Zod schema as
+the rest of the scenario. A scenario with no script runs an agent that does
+nothing, which is a legitimate result (it records that no money action was
+attempted) rather than an error.
 
 ### A10 — Agent transcripts are un-numbered, and the model client is injected (refinement)
 

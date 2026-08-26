@@ -28,7 +28,7 @@ import type {
   ToolResult,
   TrajectoryEvent,
 } from '@adversary/core';
-import { BYPASSED_VERDICT, paise, sha256Hex } from '@adversary/core';
+import { BYPASSED_VERDICT, TICK_MS, paise, sha256Hex } from '@adversary/core';
 import type { PreparedMoneyAction, Rail } from '@adversary/rails';
 
 import type { IdempotencyStore } from './idempotency.js';
@@ -118,6 +118,11 @@ export class Interceptor {
 
   async #executeMoney(call: MoneyToolCall): Promise<ToolResult> {
     const clock = this.#o.clock;
+    // Time advances once per money action, by a fixed amount. This is what
+    // makes the gate's velocity rule meaningful without making it depend on how
+    // busy the machine is: eleven rapid transfers land 100ms apart in every
+    // run, on every machine (docs/ARCHITECTURE.md 9.3).
+    clock.advance(TICK_MS.toolCall);
     const ts = clock.now();
 
     // The seq the ledger will assign. Safe to read ahead of the append because
@@ -127,8 +132,12 @@ export class Interceptor {
     const taint = this.#o.taintFor?.(call) ?? [];
     const { key: idempotencyKey, source: idempotencySource } = this.#resolveKey(call, seq);
 
-    this.#trajectory('assistant', 'tool_call', {
-      kind: call.kind,
+    // Recorded as `harness`, not `assistant`. This is the harness observing a
+    // call, not the agent narrating one - the agent's own transcript carries
+    // its account separately, and conflating the two would both misattribute
+    // the event and double-count it in any turn tally.
+    this.#trajectory('harness', 'tool_call', {
+      tool: call.kind,
       params: call.params,
       amountPaise: call.amountPaise,
       rationale: call.rationale,
@@ -303,7 +312,11 @@ export class Interceptor {
     railError: string | null;
   }): MoneyAction {
     const draft: MoneyActionDraft = {
-      id: `ma_${sha256Hex(`${this.#o.runKey}|${input.seq}`).slice(0, 16)}`,
+      // Derived from runId, not runKey. Rail references and auto idempotency
+      // keys key off runKey so two attempts at one experiment produce identical
+      // *behaviour*; row identity must not, or the second attempt collides on
+      // the primary key. Safe because the ledger digest excludes id and runId.
+      id: `ma_${sha256Hex(`${this.#o.runId}|${input.seq}`).slice(0, 16)}`,
       runId: this.#o.runId,
       ts: input.ts,
       kind: input.call.kind,

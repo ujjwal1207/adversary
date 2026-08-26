@@ -30,7 +30,7 @@ phase-to-architecture map.
 | 3 | Invariant evaluator | **done** |
 | 4 | Mock rail and interceptor | **done** |
 | 5 | Reference agents | **done** |
-| 6 | Runner and determinism | not started |
+| 6 | Runner and determinism | **done** |
 | 7 | Policy gate | not started |
 | 8 | Corpus | not started |
 | 9 | Metrics and report | not started |

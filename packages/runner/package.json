@@ -5,10 +5,18 @@
   "type": "module",
   "description": "Orchestration, seeding, the interceptor, trajectory capture, and persistence.",
   "sideEffects": false,
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./db": { "types": "./dist/db/index.d.ts", "import": "./dist/db/index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./db": {
+      "types": "./dist/db/index.d.ts",
+      "import": "./dist/db/index.js"
+    }
   },
   "scripts": {
     "build": "tsup"
@@ -21,6 +29,7 @@
     "better-sqlite3": "^11.7.0",
     "drizzle-orm": "^0.38.3",
     "pg": "^8.13.1",
+    "yaml": "^2.9.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

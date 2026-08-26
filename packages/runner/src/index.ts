@@ -6,8 +6,10 @@
  * interceptor, trajectory capture and persistence.
  *
  * Phase 4 - the interceptor and idempotency store  [done]
- * Phase 6 - the nine-step flow, the seed tree, replay, verify-determinism
+ * Phase 6 - the nine-step flow, the seed tree, replay, verify-determinism  [done]
  */
 
 export * from './db/index.js';
 export * from './interceptor/index.js';
+export * from './scenario/index.js';
+export * from './run/index.js';

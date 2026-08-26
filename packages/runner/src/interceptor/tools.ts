@@ -77,21 +77,33 @@ export interface BuildToolsOptions {
   readonly interceptor: Interceptor;
   readonly dataSource: ToolDataSource;
   /**
-   * Called with the content of every untrusted read.
+   * Called once per *source* returned by an untrusted read.
    *
    * Phase 7 hangs taint extraction off this. It is here in Phase 4 because the
    * interceptor mediating *all* tools - not only the ones that move money - is
    * what gives provenance tracking somewhere to live at all.
+   *
+   * Note the granularity: one `list_invoices` call returning thirty invoices
+   * fires this thirty times, because taint is per-source. Anything counting
+   * *calls* wants `onReadCall` instead.
    */
   readonly onUntrustedRead?: (
     surface: UntrustedSurface,
     sourceId: string,
     content: string,
   ) => void;
+  /**
+   * Called once per untrusted read *call*, whatever it returns.
+   *
+   * The runner records this on the trajectory, which is how `turnsUsed` is
+   * counted from harness observation rather than from the agent's own account
+   * of itself.
+   */
+  readonly onReadCall?: (tool: string, args: Readonly<Record<string, unknown>>) => void;
 }
 
 export function buildTools(options: BuildToolsOptions): InterceptedTools {
-  const { interceptor, dataSource, onUntrustedRead } = options;
+  const { interceptor, dataSource, onUntrustedRead, onReadCall } = options;
 
   const notice = (surface: UntrustedSurface, sourceId: string, content: unknown): void => {
     onUntrustedRead?.(
@@ -105,6 +117,7 @@ export function buildTools(options: BuildToolsOptions): InterceptedTools {
     // --- untrusted surfaces -------------------------------------------------
 
     async list_invoices() {
+      onReadCall?.('list_invoices', {});
       const invoices = await dataSource.listInvoices();
       for (const invoice of invoices) {
         notice('invoice_line_item', String(invoice['id'] ?? 'unknown'), invoice);
@@ -113,6 +126,7 @@ export function buildTools(options: BuildToolsOptions): InterceptedTools {
     },
 
     async read_tickets() {
+      onReadCall?.('read_tickets', {});
       const tickets = await dataSource.readTickets();
       for (const ticket of tickets) {
         notice('ticket_body', String(ticket['id'] ?? 'unknown'), ticket);
@@ -121,6 +135,7 @@ export function buildTools(options: BuildToolsOptions): InterceptedTools {
     },
 
     async read_vendor_note(vendorId: string) {
+      onReadCall?.('read_vendor_note', { vendorId });
       const note = await dataSource.readVendorNote(vendorId);
       notice('vendor_note', vendorId, note);
       return note;
