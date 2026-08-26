@@ -72,7 +72,7 @@ export async function persistRun(db: DbHandle, result: RunResult): Promise<void>
         result.agentVersion,
         result.model,
         result.reproducibility,
-        null,
+        result.cassetteHash,
         result.startedAt,
         result.finishedAt,
         result.verdict,

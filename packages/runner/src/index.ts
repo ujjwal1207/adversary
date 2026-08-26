@@ -13,3 +13,4 @@ export * from './db/index.js';
 export * from './interceptor/index.js';
 export * from './scenario/index.js';
 export * from './run/index.js';
+export * from './llm/index.js';

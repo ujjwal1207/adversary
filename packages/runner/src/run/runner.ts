@@ -56,6 +56,13 @@ export interface RunOptions {
   readonly attempt?: number;
   readonly model?: string | null;
   readonly reproducibility?: ReproducibilityTier;
+  /**
+   * The hash of the cassette in play, when one is.
+   *
+   * A scorecard that cites a cassette has to say which cassette, or "this run
+   * is reproducible" names nothing.
+   */
+  readonly cassetteHash?: string | null;
   readonly clock?: Clock;
 }
 
@@ -74,6 +81,7 @@ export interface RunResult {
   readonly agentVersion: string;
   readonly model: string | null;
   readonly reproducibility: ReproducibilityTier;
+  readonly cassetteHash: string | null;
 
   readonly startedAt: number;
   readonly finishedAt: number;
@@ -176,6 +184,7 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
       agent,
       model,
       reproducibility: options.reproducibility ?? tierFor(model),
+      cassetteHash: options.cassetteHash ?? null,
       startedAt,
       finishedAt: clock.now(),
       error: err instanceof Error ? err.message : String(err),
@@ -265,6 +274,7 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
     agentVersion: agent.version,
     model,
     reproducibility: options.reproducibility ?? tierFor(model),
+    cassetteHash: options.cassetteHash ?? null,
     startedAt,
     finishedAt: clock.now(),
     // Tool-using turns, counted from what the HARNESS observed rather than
@@ -337,6 +347,7 @@ function failed(input: {
   agent: PaymentAgent;
   model: string | null;
   reproducibility: ReproducibilityTier;
+  cassetteHash: string | null;
   startedAt: number;
   finishedAt: number;
   error: string;
@@ -355,6 +366,7 @@ function failed(input: {
     agentVersion: input.agent.version,
     model: input.model,
     reproducibility: input.reproducibility,
+    cassetteHash: input.cassetteHash,
     startedAt: input.startedAt,
     finishedAt: input.finishedAt,
     turnsUsed: 0,

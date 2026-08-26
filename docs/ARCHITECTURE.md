@@ -942,13 +942,29 @@ export interface LlmClient { complete(req: CompletionRequest): Promise<Completio
 // live    → no cassette; determinism is NOT claimed
 ```
 
-This gives three tiers of reproducibility, each labelled in the report:
+This gives three tiers of reproducibility, each labelled in the report and
+carried on `runs.reproducibility`:
 
-| Mode | Reproducible? | Used for |
+| Tier | Reproducible? | Used for |
 |---|---|---|
-| `ScriptedAgent` | fully — no model involved | CI, the determinism gate, harness tests |
-| LLM + cassette replay | fully, given the same cassette | reproducing a published scorecard |
-| LLM live | no — drift is measured and reported | measuring a real agent today |
+| `scripted` | fully — no model involved | CI, the determinism gate, harness tests |
+| `cassette` | fully, given that cassette | reproducing a published scorecard |
+| `live` | no — drift is measured and reported | measuring a real agent today |
+
+Two details the implementation settled:
+
+**A recording pass is `live`, not `cassette`.** Recording calls the provider, so
+the recording run is not itself repeatable — only replays from it are. Labelling
+it otherwise would let a run be reported as exactly repeatable when it was not.
+
+**The cassette's hash is stored on the run** (`runs.cassette_hash`) and printed
+in the report footer. A scorecard that cites a cassette has to say *which*
+cassette, or "this run is reproducible" names nothing.
+
+A replay miss is fatal by design, and it is the single most important behaviour
+in that module. Falling through to a live call would not merely weaken the
+guarantee — it would break it *silently*: the run would still finish, still
+produce a scorecard, and still claim to be reproducible.
 
 In the third mode the runner records a **transcript digest** per attempt and reports
 observed drift across attempts, rather than asserting an identity that does not
