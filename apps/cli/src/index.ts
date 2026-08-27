@@ -442,9 +442,15 @@ program
     }
 
     const attacks = corpus.filter((c) => c.scenario.kind === 'attack').length;
+
+    // The hash is always of the whole corpus, never of the filtered view: it is
+    // the identifier a scorecard cites, and one computed over six scenarios
+    // printed under the same label would silently mean something else.
+    const whole = loadCorpus(scenarioFiles(scenarioRoot()));
+
     console.log(
-      `\n${corpus.length} scenarios · ${attacks} attack · ${corpus.length - attacks} benign` +
-        `\ncorpus hash ${corpusHash(corpus)}`,
+      `\nshowing ${corpus.length} · ${attacks} attack · ${corpus.length - attacks} benign` +
+        `\ncorpus hash ${corpusHash(whole)} (${whole.length} scenarios)`,
     );
   });
 

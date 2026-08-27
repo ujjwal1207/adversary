@@ -1329,11 +1329,31 @@ adversary verify-determinism [--scenario X] [--attempts N]
 ```
 
 Plus `pnpm demo`: fresh DB → full corpus gate-off → full corpus gate-on → generate
-report → print path.
+report → print path. And `pnpm dashboard`, which serves the viewer over the
+snapshot the report wrote.
+
+**As built**, with three differences, all recorded in §17:
+
+- `--cassette` is read from the environment (`ADVERSARY_CASSETTE`,
+  `ADVERSARY_CASSETTE_MODE`) rather than from a flag, so a replay needs no
+  credentials at all and the cassette travels with the run rather than with the
+  invocation.
+- `--rail live-test` is recognised and **refused** (A19).
+- `report` writes a JSON snapshot beside the HTML, from the same read (A17).
+
+`--seed N` rewrites the scenario source and re-parses rather than mutating the
+loaded object: the seed is part of the content hash, and a run whose seed
+differed from the hash it cited would be unreproducible in the one way the hash
+exists to prevent.
 
 **Acceptance:** on a clean machine with only an API key set,
-`pnpm install && pnpm demo` produces a scorecard. Verified in a fresh container, not
-on the development machine.
+`pnpm install && pnpm demo` produces a scorecard. **This cannot be checked on a
+development machine** — there is always a warm store, a built `dist`, a database
+from last time. A fresh CI runner with no credentials set is the nearest honest
+equivalent, and the `demo` job in `.github/workflows/ci.yml` is that check. It
+also asserts the report carries both numbers and that the snapshot covers every
+scenario in both gate states, because a scorecard that exists is not the same as
+a scorecard that says anything.
 
 ### 13.3 Dashboard (`apps/dashboard`)
 
@@ -1348,6 +1368,13 @@ trajectory must be able to see that the dispute was manufactured, without having
 read the docs first.
 
 A viewer, not a product. Boring and legible beats designed.
+
+**As built:** static over a JSON snapshot, with no backend at all (A17). The
+`SYNTHETIC` badge is rendered from a flag computed by walking event payloads, and
+it is unit-tested even though no scenario in the shipped corpus produces one —
+a safety label that has never been shown to appear is a safety label nobody
+should trust. A second badge says plainly when a number came off the mock rail,
+since mock and live figures are never aggregated (P5).
 
 ---
 
@@ -1498,6 +1525,70 @@ machine load ([§9.3](#93-the-virtual-clock)).
 
 Blast radius is unauditable without knowing which actions produced it
 ([§11.5](#115-witness-sets-and-blast-radius)).
+
+### A19 — `--rail live-test` is refused by the CLI, not wired to it (deviation)
+
+**Spec:** `adversary run ... [--rail mock|live-test]`.
+
+**Issue:** the live rail needs a provider test key, an endpoint and a webhook
+secret, none of which the runner constructs for itself. Wiring it to a
+convenience flag would mean a flag could aim the harness at a payment provider —
+which is exactly the misconfiguration `docs/THREAT-MODEL.md` constraint 1 exists
+to prevent — and this build has never exercised the rail against a real
+provider, so a flag that appeared to work would be the worst outcome of all.
+
+**Resolution:** the flag is recognised and refused with an explanation naming
+`docs/LIMITATIONS.md`. An operator who wants the live rail constructs
+`LiveTestRail` themselves and passes it to `runScenario`, which takes a `Rail`.
+The refusal is one line and reversible; the alternative is a plausible-looking
+path to a payment provider through a command-line argument.
+
+### A18 — `@adversary/core` gained a `./money` subpath, and the agents rule became an allowlist (addition)
+
+**Earlier:** core exported `.` and `./contracts`, and a boundary test asserted
+there was no third subpath — that absence being what made "agents may import
+contracts only" enforceable.
+
+**Issue:** the browser viewer must format rupees with the same function the
+report uses, or a second implementation of Indian digit grouping drifts from the
+first. Importing the package root pulls in `canonical.ts`, which needs
+`node:crypto` and will not bundle for a browser.
+
+**Resolution:** a `./money` entry for the pure money module. That widened what an
+agent could reach, because the lint rule enumerated known-bad names — so the rule
+is now an allowlist: `['@adversary/core/*', '!@adversary/core/contracts']` closes
+every core subpath except contracts, whatever the exports map contains. That is
+strictly stronger than the property it replaced, and a boundary test asserts
+`@adversary/core/money` is refused from `packages/agents`.
+
+One trap worth recording: those patterns use gitignore semantics, where
+excluding a directory makes it impossible to re-include anything beneath it. The
+bare package name must **not** appear in the group, or the negation silently does
+nothing and contracts is blocked too. It is caught by a test that asserts
+contracts is permitted, which is why that test exists as well as its opposite.
+
+### A17 — The viewer reads an evidence snapshot; there is no dashboard backend (addition)
+
+**Spec ([§13.3](#133-dashboard-appsdashboard)):** three screens, React, Vite,
+Tailwind.
+
+**Issue:** the screens need data, and the obvious route — a small server over the
+database — means a process listening on a port. Nothing else in this repository
+opens one, and adding one for a viewer would put a network surface into a
+project whose threat model is largely about not having any.
+
+**Resolution:** `adversary report` writes `report.html` and a JSON snapshot from
+the same read, and the viewer is static over that snapshot. Three consequences,
+all of them improvements: the report and the viewer can never be looking at
+different evidence; a snapshot can be attached to a pull request or archived
+beside the scorecard it describes; and the viewer opens on a machine that has
+never run the harness.
+
+The snapshot carries `version: 1` and the viewer refuses an unknown version
+rather than half-rendering it. Its `synthetic` flag is computed by walking event
+payloads for `synthetic: true` — never from a list of scenario names — because
+the badge `docs/THREAT-MODEL.md` promises must keep working when the payload
+shape changes.
 
 ### A16 — The corpus is 50/50 attack/benign, not 60/40 (deviation)
 
@@ -1691,7 +1782,7 @@ demo, and no change should erode either.
 | 8 Corpus | §12.2 | ≥60 scenarios; deterministic across 3 runs; every `expect` matches for both gate states |
 | 9 Metrics and report | §12, §13.1 | metrics match hand-computed fixtures; both numbers at equal weight; rail badge on every number |
 | 10 Live rail | §6.6, §14, §15 | marquee scenarios on test mode; live key refused at construction; bounded fallbacks; tampered signatures rejected |
-| 11 CLI, demo, dashboard | §13 | clean container, API key only, `pnpm install && pnpm demo` produces a scorecard |
+| 11 CLI, demo, dashboard | §13 | clean container, API key only, `pnpm install && pnpm demo` produces a scorecard — **as the `demo` CI job**, not on a developer machine |
 | 12 Docs and CI | all | a stranger can clone, run, understand the limits, and reproduce the headline numbers |
 
 ---

@@ -9,18 +9,142 @@ specified invariants, and produces a reproducible scorecard.
 
 Every report shows two numbers side by side, at equal weight:
 
-- **Attack success rate** - how often adversarial scenarios produce a policy violation
-- **False-positive cost** - how much legitimate business the defence blocks, in currency
+- **Attack success rate** — how often adversarial scenarios produce a policy violation
+- **False-positive cost** — how much legitimate business the defence blocks, in currency
 
 Reporting either alone is misleading. A gate that blocks everything scores a
 perfect attack success rate and is useless.
 
 **It is a test harness, not an agent.**
 
+## Quickstart
+
+Requires Node 20.11+ and pnpm 10. No services, no API keys, no network.
+
+```bash
+pnpm install && pnpm demo
+```
+
+That runs all 60 scenarios twice — once with the policy gate off, once with it
+on — and writes `report.html`. On the reference `ScriptedAgent` against the mock
+rail:
+
+| | Attack success | Containment | Blast radius | False-positive cost |
+|---|---|---|---|---|
+| Gate off | 100.0% | 0.0% | ₹1,76,644.00 | ₹0.00 |
+| Gate on | 13.3% | 85.7% | ₹3,997.00 | ₹8,980.00 |
+
+The gate takes attack success from 100% to 13.3%, and it withholds ₹8,980 of
+legitimate business to do it. Both numbers, always, together.
+
+The residual 13.3% is corpus scenario `E2` and the whole of family `F` — attacks
+about *scope* and *stop rules* rather than about money, which the eight rules
+have nothing to say about. Those scenarios are in the corpus deliberately: one
+containing only attacks the gate catches would be a corpus that flattered the
+gate. See [`docs/POLICY.md`](docs/POLICY.md).
+
+Then, to look at the evidence rather than the summary:
+
+```bash
+pnpm dashboard
+```
+
+## The command line
+
+```
+adversary run [scenario | --family B | --all] [--gate on|off|both]
+              [--seed N] [--agent scripted|ops|naive] [--fresh]
+adversary report [--out report.html] [--json snapshot.json]
+adversary replay <runId>
+adversary list-scenarios [--family B]
+adversary verify-determinism [--scenario X] [--attempts N]
+```
+
+`run` writes to the database; `report` reads from it. Keeping those separate is
+what lets a scorecard be regenerated months later from stored evidence rather
+than from a re-run — and what makes `adversary replay` able to print exactly
+what happened, with the full eight-rule trace behind every decision.
+
+`--agent scripted` is the default and needs no credentials, which is why CI can
+run the whole corpus and the determinism check on every push. `ops` and `naive`
+need a model; a recorded cassette replays one with no credentials at all.
+
+```bash
+pnpm adversary -- list-scenarios --family B
+pnpm adversary -- run B1_invoice_borne_redirect --gate both
+pnpm adversary -- verify-determinism --family A
+```
+
+Postgres instead of SQLite is a two-variable change:
+
+```bash
+ADVERSARY_DB_DIALECT=postgres ADVERSARY_PG_URL=postgres://... pnpm db:migrate
+```
+
+## How it works
+
+```
+                    ┌───────────────────────────────────┐
+   scenario  ─────► │  runner — the composition root    │
+   (YAML,           │  seed ▸ inject ▸ invoke ▸ verify  │
+    hashed)         └───────────────┬───────────────────┘
+                                    │ goal, policy, tools
+                                    ▼
+                    ┌───────────────────────────────────┐
+                    │  agent under test                 │  ◄── the only thing
+                    │  (yours, or a reference agent)    │      being measured
+                    └───────────────┬───────────────────┘
+                                    │ every money action
+                                    ▼
+                    ┌───────────────────────────────────┐
+                    │  INTERCEPTOR — the one chokepoint │
+                    │                                   │
+                    │   taint  ▸  gate  ▸  idempotency  │
+                    └───────┬───────────────────┬───────┘
+                            │ allowed           │ every attempt, decided or not
+                            ▼                   ▼
+                    ┌───────────────┐   ┌───────────────────┐
+                    │  rail         │   │  ledger           │
+                    │  mock │ test  │   │  append-only,     │
+                    └───────────────┘   │  deep-frozen      │
+                                        └─────────┬─────────┘
+                                                  │
+                                                  ▼
+                                        ┌───────────────────┐
+                                        │  invariants       │
+                                        │  hand-rolled DSL, │
+                                        │  never an LLM     │
+                                        └─────────┬─────────┘
+                                                  ▼
+                                          scorecard · report
+                                           · trajectory
+```
+
+Four things in that picture are load-bearing:
+
+**The agent cannot reach a rail.** Its only path to money is through
+interceptor-provided tools, enforced four ways: pnpm module resolution, a lint
+rule, an import-graph test, and the frozen tool object the runner hands in. An
+agent that could call a rail directly would make every number a claim about
+nothing.
+
+**The ledger records attempts, not just executions.** A blocked action is
+evidence. Without it, a gate could not be told apart from an agent that never
+tried.
+
+**The oracle is a deterministic function of the ledger.** The invariant
+evaluator is a hand-written lexer, parser and tree-walker — never `eval()`,
+never a language model. A judge that shares the agent's failure modes is not a
+judge.
+
+**Every run is keyed by content hash and seed.** Same scenario, same seed, same
+agent ⇒ byte-identical ledger. `adversary verify-determinism` checks that across
+the corpus, and CI runs it on every push.
+
 ## Status
 
-Under construction, built in twelve phases against a written specification with
-an acceptance gate at each one. See `docs/ARCHITECTURE.md` section 19 for the
+Built in twelve phases against a written specification, with an acceptance gate
+at each one. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §19 for the
 phase-to-architecture map.
 
 | Phase | | |
@@ -32,58 +156,46 @@ phase-to-architecture map.
 | 5 | Reference agents | **done** |
 | 6 | Runner and determinism | **done** |
 | 7 | Policy gate | **done** |
-| 8 | Corpus | **done** - 60 scenarios, families A-G |
+| 8 | Corpus | **done** — 60 scenarios, families A–G |
 | 9 | Metrics and report | **done** |
-| 10 | Live rail | **done** - except live-mode verification, see LIMITATIONS |
-| 11 | CLI, demo, dashboard | not started |
-| 12 | Documentation and CI | not started |
+| 10 | Live rail | **done** — except live-mode verification, see LIMITATIONS |
+| 11 | CLI, demo, dashboard | **done** — the clean-container half of the gate runs in CI, not here |
+| 12 | Documentation and CI | **done** |
 
-Nothing here runs a scenario yet. `pnpm demo` arrives in Phase 11.
-
-## Running what exists
-
-Requires Node 20.11+ and pnpm 10. No services, no API keys.
-
-```bash
-pnpm install
-pnpm verify        # typecheck, lint, build, test
-pnpm db:migrate    # creates the five tables in ./adversary.sqlite
-pnpm scorecard     # runs the 60-scenario corpus twice, writes report.html
-```
-
-`pnpm scorecard` on the reference `ScriptedAgent`, mock rail:
-
-| | Attack success | Containment | Blast radius | False-positive cost |
-|---|---|---|---|---|
-| Gate off | 100.0% | 0.0% | ₹1,76,644.00 | ₹0.00 |
-| Gate on | 13.3% | 85.7% | ₹3,997.00 | ₹8,980.00 |
-
-The gate takes attack success from 100% to 13.3%, and it withholds ₹8,980 of
-legitimate business to do it. Both numbers, always, together. The residual 13.3%
-is families E2 and F - attacks about *scope* rather than about money, which the
-eight rules have nothing to say about.
-
-Postgres instead of SQLite is a two-variable change:
-
-```bash
-ADVERSARY_DB_DIALECT=postgres ADVERSARY_PG_URL=postgres://... pnpm db:migrate
-```
+935 tests, 4 skipped. The four are the Postgres suite, which runs in CI against
+a `postgres:16` service container and has never run on a developer machine here.
 
 ## Documentation
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - the design contract this build follows
-- [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) - the safety boundary, and where each constraint is enforced
-- `docs/POLICY.md` - Phase 12
-- [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) - every known gap, including what this build has not verified
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the design contract this build follows
+- [`docs/POLICY.md`](docs/POLICY.md) — the eight rules, and what the gate has no way to know
+- [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) — the safety boundary, and where each constraint is enforced
+- [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) — every known gap, including what this build has not verified
+
+`LIMITATIONS.md` is long, and not because the project is weak. A tool whose
+premise is *"your guardrails may not do what you think"* has no business being
+vague about its own.
+
+## Developing
+
+```bash
+pnpm verify        # typecheck, lint, build, test — what CI runs
+pnpm test          # 935 tests, no services required
+pnpm db:migrate    # creates the five tables in ./adversary.sqlite
+```
 
 ## Safety boundary
 
 This is a defensive security-testing tool. Every scenario is a test fixture run
 against the operator's own agent, in a sandbox, against a payment provider's
-test mode. There is no target-host parameter anywhere in the configuration
-schema: the system under test is always locally instantiated through the
-`PaymentAgent` interface. The live-test rail refuses to construct on anything
-other than a test key. All fixtures are obviously synthetic.
+test mode.
+
+There is no target-host parameter anywhere in the configuration schema: the
+system under test is always locally instantiated through the `PaymentAgent`
+interface. The live-test rail **throws at construction** on anything other than
+a recognised test key, and fails closed on a key it does not recognise. All
+fixtures are obviously synthetic, and a test scans the corpus for anything
+resembling a real account number, IFSC, IBAN or card number.
 
 ## Licence
 

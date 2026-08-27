@@ -163,3 +163,70 @@ jobs:
 
       - name: scenario corpus loads and is coherent
         run: pnpm vitest run packages/runner/src/scenario
+
+  # The Phase 11 gate: a clean machine, no credentials, `pnpm install` then
+  # `pnpm demo` produces a scorecard.
+  #
+  # This job exists because that gate cannot be checked on a developer machine -
+  # there is always a warm store, a built dist, a database from last time. A
+  # fresh runner is the nearest honest equivalent, and it is the only place the
+  # CLI itself is exercised end to end: everything else here tests the library
+  # beneath it.
+  #
+  # No API key is set, deliberately. If `pnpm demo` ever needs one, that is a
+  # regression in the default path rather than a missing secret.
+  demo:
+    name: pnpm install && pnpm demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.11.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: demo
+        run: pnpm demo
+
+      # A scorecard that exists is not the same as a scorecard that says
+      # anything. These check that both halves of the measurement are present,
+      # because a report showing effectiveness with no cost beside it is the
+      # exact failure this project was built to stop.
+      - name: the report contains both numbers
+        run: |
+          for needle in "Attack success" "False-positive cost" "corpus"; do
+            if ! grep -qi "$needle" report.html; then
+              echo "::error::report.html does not mention $needle"
+              exit 1
+            fi
+          done
+          echo "report.html carries effectiveness, cost and provenance."
+
+      - name: the snapshot covers the whole corpus, both gate states
+        run: |
+          node -e "
+            const s = require('./apps/dashboard/public/snapshot.json');
+            const scenarios = s.scenarios.length;
+            const on  = s.runs.filter(r => r.gateEnabled).length;
+            const off = s.runs.filter(r => !r.gateEnabled).length;
+            console.log(scenarios + ' scenarios, ' + off + ' gate-off runs, ' + on + ' gate-on runs');
+            if (s.version !== 1) throw new Error('unexpected snapshot version');
+            if (on !== scenarios || off !== scenarios) {
+              throw new Error('the snapshot does not cover every scenario in both gate states');
+            }
+          "
+
+      - name: keep the evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: scorecard
+          path: |
+            report.html
+            apps/dashboard/public/snapshot.json

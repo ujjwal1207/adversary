@@ -53,6 +53,46 @@ beneath it — not a model's judgment. Every number in the shipped scorecard com
 from `ScriptedAgent`, so it measures **the harness and the gate**, not any
 model's behaviour.
 
+### The clean-container gate runs in CI, and CI has not been observed running
+
+Phase 11's acceptance condition is that a clean container with only an API key
+set produces a scorecard from `pnpm install && pnpm demo`. There is no container
+runtime on the machine this was built on, so the condition **cannot be checked
+here**: a developer machine always has a warm store, a built `dist`, and a
+database from last time.
+
+The `demo` job in `.github/workflows/ci.yml` is that check on a fresh runner with
+no credentials set, and it asserts more than exit zero — that the report carries
+both numbers, and that the snapshot covers every scenario in both gate states.
+
+What has been verified here: `pnpm demo` from a deleted database and a deleted
+report reproduces the shipped numbers exactly. What has not: that it does so on a
+machine that has never seen this repository. **No CI run of that job has been
+observed from here either**, since these workflows have never been executed.
+
+### The dashboard has no test suite
+
+It is typechecked, linted, and built. Its logic is thin by design — the numbers
+arrive precomputed in the snapshot — and the two defects found in it were found
+by reading it against the data and by closing a type, not by a test.
+
+That is a real gap. `railResult === 'executed'` typechecked as `string` for as
+long as the field was typed loosely, and every "moved" column read a reassuring
+₹0.00 next to runs where money had in fact left. The union is closed now, which
+turns that class of mistake into a compile error rather than a test that nobody
+wrote.
+
+### The SYNTHETIC badge never appears in the shipped demo
+
+There is no dispute scenario, so nothing in the corpus produces a payload
+carrying `synthetic: true`, so the badge the interface promises is never seen by
+anyone running `pnpm demo`.
+
+The detection is unit-tested — including that it finds a flag nested anywhere in
+a payload, and that it is not fooled by the word appearing as a value or by
+`synthetic: false`. But a reader should know that the label's first real outing
+will be the day a dispute scenario lands.
+
 ### Postgres is verified in CI only
 
 `pnpm db:migrate` and the full suite run against a `postgres:16` service
@@ -198,3 +238,6 @@ catches.
 | Money-action ids collided across two attempts at one experiment | the determinism gate |
 | `turnsUsed` double-counted the interceptor's and the agent's records | the runner tests |
 | A benign scenario paid an amount that existed only in the invoice text | corpus A4 |
+| A persisted verdict came back in a different order, and `undefined` came back as `null` | the round-trip test |
+| The viewer summed a rail result that does not exist, reporting ₹0.00 moved | reading it against the data |
+| A new `core` subpath widened what an agent could import | the boundary test |
