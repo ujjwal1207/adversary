@@ -9,6 +9,9 @@
  * Phase 6 - the nine-step flow, the seed tree, replay, verify-determinism  [done]
  */
 
+export type { LoadEnvResult } from './env.js';
+export { loadEnvFile, parseEnv } from './env.js';
+
 export * from './db/index.js';
 export * from './interceptor/index.js';
 export * from './scenario/index.js';

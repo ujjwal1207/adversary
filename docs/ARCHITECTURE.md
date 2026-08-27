@@ -1583,6 +1583,42 @@ manufactured and carries `synthetic: true` — so this is also the scenario that
 finally makes the badge `docs/THREAT-MODEL.md` promises appear in the shipped
 demo, rather than only in a unit test.
 
+### A21 — A third provider, and a `.env` loader with two rules (addition)
+
+**Spec:** the harness is model-agnostic; the agent is handed an `LlmClient` and
+never names a provider.
+
+**Issue:** two adapters is thin evidence for that claim, and the two chosen were
+the two whose wire formats are most alike. Both put an opaque id on a tool call,
+both have a stop reason meaning "I asked for a tool", both call the assistant
+`assistant`. A translation layer that only ever spanned those two would look
+general and not be.
+
+**Resolution:** `GeminiLlm`. It disagrees with the other two on every one of
+those points — no ids on tool calls, no tool-use stop reason, and the assistant
+is `model` — so the parity test that asserts all three produce an identical
+completion object from their own wire formats now means something. The id
+problem is solved by minting `name#index` and decoding the name back out when a
+result returns, which is deterministic, stateless, and survives one turn calling
+the same tool twice.
+
+Configuration came with it. `packages/runner/src/env.ts` reads a `.env` if one
+is there, under two rules it will not bend on:
+
+- **A real environment variable always wins.** CI supplies secrets as
+  environment variables, and a `.env` left in a working copy must not silently
+  replace one — "what was actually set" needs a single answer.
+- **Nothing is interpolated.** No `${OTHER}` expansion, so the file's meaning
+  cannot depend on the order its lines are read. It holds API keys.
+
+It reports the names it applied and never the values, because the CLI prints
+that summary and a loader returning values would put a credential one
+`console.log` from a terminal transcript.
+
+Node's own `--env-file` was the obvious alternative and was rejected: it throws
+when the file is absent, and the default path for this project is that there is
+no file and no credentials at all.
+
 ### A19 — `--rail live-test` is refused by the CLI, not wired to it (deviation)
 
 **Spec:** `adversary run ... [--rail mock|live-test]`.

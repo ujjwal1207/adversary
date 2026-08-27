@@ -37,6 +37,7 @@ import {
   deriveRunKey,
   describeConfig,
   llmConfigFromEnv,
+  loadEnvFile,
   loadCorpus,
   migrate,
   nextAttempt,
@@ -52,6 +53,11 @@ import {
   scriptFor,
   verifyDeterminism,
 } from '@adversary/runner';
+
+// Before anything reads a variable. A real environment variable always wins, so
+// `GEMINI_API_KEY=... pnpm adversary ...` overrides the file rather than
+// fighting it.
+const env = loadEnvFile();
 
 const program = new Command();
 
@@ -109,6 +115,16 @@ async function withDb<T>(fn: (db: DbHandle) => Promise<T>): Promise<T> {
   }
 }
 
+/** Says what was loaded, without ever printing a value. */
+function describeEnv(): string {
+  if (env.path === null) return '';
+  const parts = [`${env.applied.length} from .env`];
+  if (env.skipped.length > 0) {
+    parts.push(`${env.skipped.length} already set in the environment`);
+  }
+  return `  (${parts.join(', ')})`;
+}
+
 function fail(message: string): never {
   console.error(`adversary: ${message}`);
   process.exit(1);
@@ -161,7 +177,9 @@ program
       console.log(
         `running ${scenarios.length} scenario(s) on the ${rail} rail, ` +
           `gate ${gateStates.map((g) => (g ? 'on' : 'off')).join(' and ')}, ` +
-          `agent ${agent === null ? 'per-scenario script' : agent.name}`,
+          `agent ${agent === null ? 'per-scenario script' : agent.name}` +
+          (model === null ? '' : ` · ${model}`) +
+          (agent === null ? '' : describeEnv()),
       );
 
       for (const loaded of scenarios) {
@@ -274,10 +292,14 @@ function resolveLlm(): ResolvedLlm {
     if (cassette && mode === 'replay') return replayFromCassette(cassette);
 
     fail(
-      'That agent needs a model. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, ' +
-        'replay a cassette with ADVERSARY_CASSETTE and ' +
+      'That agent needs a model. Set one of ANTHROPIC_API_KEY, OPENAI_API_KEY ' +
+        'or GEMINI_API_KEY - in your shell or in a .env file beside ' +
+        'package.json - or replay a cassette with ADVERSARY_CASSETTE and ' +
         'ADVERSARY_CASSETTE_MODE=replay, or use --agent scripted, which needs ' +
-        'no credentials and is what CI runs.',
+        'no credentials and is what CI runs.' +
+        (env.path === null
+          ? '\n  No .env file was found in this directory.'
+          : `\n  Read ${env.path}${describeEnv()}, but no model key was among them.`),
     );
   }
 

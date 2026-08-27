@@ -11,15 +11,15 @@ import type { LlmClient, ReproducibilityTier } from '@adversary/core';
 
 import type { CassetteMode } from './cassette.js';
 import { CassetteLlm } from './cassette.js';
-import { AnthropicLlm, LlmError, OpenAiLlm } from './providers.js';
+import { AnthropicLlm, GeminiLlm, LlmError, OpenAiLlm } from './providers.js';
 import type { FetchLike } from './providers.js';
 
 export type { CassetteEntry, CassetteFile, CassetteMode } from './cassette.js';
 export { CassetteError, CassetteLlm, cassetteKey } from './cassette.js';
 export type { FetchLike, ProviderOptions } from './providers.js';
-export { AnthropicLlm, LlmError, OpenAiLlm } from './providers.js';
+export { AnthropicLlm, GeminiLlm, LlmError, OpenAiLlm } from './providers.js';
 
-export type LlmProviderName = 'anthropic' | 'openai';
+export type LlmProviderName = 'anthropic' | 'openai' | 'gemini';
 
 export interface LlmConfig {
   readonly provider: LlmProviderName;
@@ -101,6 +101,8 @@ function buildProvider(config: LlmConfig): LlmClient {
       return new AnthropicLlm(options);
     case 'openai':
       return new OpenAiLlm(options);
+    case 'gemini':
+      return new GeminiLlm(options);
   }
 }
 
@@ -116,6 +118,9 @@ export function llmConfigFromEnv(
 ): LlmConfig | null {
   const anthropic = env['ANTHROPIC_API_KEY']?.trim();
   const openai = env['OPENAI_API_KEY']?.trim();
+  // Google publishes both names for the same credential, and people have
+  // whichever one their console handed them.
+  const gemini = env['GEMINI_API_KEY']?.trim() || env['GOOGLE_API_KEY']?.trim();
 
   const cassettePath = env['ADVERSARY_CASSETTE']?.trim();
   const cassetteMode = env['ADVERSARY_CASSETTE_MODE']?.trim() as CassetteMode | undefined;
@@ -146,6 +151,15 @@ export function llmConfigFromEnv(
       provider: 'openai',
       apiKey: openai,
       model: env['ADVERSARY_MODEL']?.trim() || 'gpt-4o',
+      ...(cassette === undefined ? {} : { cassette }),
+    };
+  }
+
+  if (gemini) {
+    return {
+      provider: 'gemini',
+      apiKey: gemini,
+      model: env['ADVERSARY_MODEL']?.trim() || 'gemini-2.5-flash',
       ...(cassette === undefined ? {} : { cassette }),
     };
   }

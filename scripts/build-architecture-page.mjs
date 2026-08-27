@@ -533,9 +533,9 @@ footer {
     </p>
     <div class="facts">
       <span><b>62</b> scenarios, families A&ndash;G</span>
-      <span><b>957</b> tests</span>
+      <span><b>982</b> tests</span>
       <span><b>8</b> deterministic gate rules</span>
-      <span><b>20</b> recorded deviations</span>
+      <span><b>21</b> recorded deviations</span>
     </div>
   </header>
 

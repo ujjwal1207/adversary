@@ -1,10 +1,10 @@
 /**
  * Provider adapters.
  *
- * Two of them, because "the harness is model-agnostic" is a claim, and a claim
- * with one implementation behind it is untested. Both satisfy the same
- * `LlmClient` interface, and no agent ever names a provider - it is handed a
- * client (docs/ARCHITECTURE.md 6.7).
+ * Three of them, because "the harness is model-agnostic" is a claim, and a
+ * claim with one implementation behind it is untested. All three satisfy the
+ * same `LlmClient` interface, and no agent ever names a provider - it is handed
+ * a client (docs/ARCHITECTURE.md 6.7).
  *
  * `fetch` is injectable so the request shaping can be tested without a network
  * or a key: what these adapters get wrong is almost never the HTTP, it is the
@@ -322,6 +322,185 @@ function parseArgs(raw: string): Record<string, unknown> {
       : {};
   } catch {
     return {};
+  }
+}
+
+// --- Gemini -----------------------------------------------------------------
+
+/**
+ * Google's Generative Language API.
+ *
+ * Three differences from the other two are worth naming, because each is a
+ * place a translation can be silently wrong rather than loudly broken.
+ *
+ * **Tool calls carry no id.** Anthropic and OpenAI both identify a tool call
+ * with an opaque id and expect the result to quote it back. Gemini matches a
+ * `functionResponse` to its `functionCall` by *name*. Our `LlmToolCall` needs
+ * an id, so this adapter mints one - `name#index` - and decodes the name back
+ * out when the result returns. Deterministic, stateless, and it survives a
+ * model calling the same tool twice in one turn, which a bare name would not.
+ *
+ * **There is no tool-use stop reason.** Gemini finishes with `STOP` whether it
+ * wrote prose or asked for a tool. The stop reason is therefore derived from
+ * whether any function call came back, because the agent loop branches on it -
+ * reporting `end_turn` on a turn that requested a tool would end the run one
+ * step early and record it as the agent choosing to stop.
+ *
+ * **The assistant is called `model`.** Trivial, but a wrong role name comes
+ * back as a 400 rather than as a misunderstanding, and it is the first thing to
+ * check if this ever fails against the real API.
+ *
+ * Never exercised against Google's servers. See docs/LIMITATIONS.md.
+ */
+export class GeminiLlm extends HttpLlm {
+  constructor(options: ProviderOptions) {
+    super(options, 'https://generativelanguage.googleapis.com');
+  }
+
+  async complete(request: LlmRequest): Promise<LlmCompletion> {
+    const declarations = request.tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      // A function with no arguments must omit `parameters` entirely rather
+      // than declare an empty property bag, which the API rejects. Three of
+      // this project's read tools take no arguments, so this is not a corner.
+      ...(hasProperties(tool.parameters) ? { parameters: tool.parameters } : {}),
+    }));
+
+    const body = {
+      systemInstruction: { parts: [{ text: request.system }] },
+      contents: request.messages.map(toGeminiContent),
+      // An empty `tools` array is rejected, so the key is omitted instead.
+      ...(declarations.length > 0 ? { tools: [{ functionDeclarations: declarations }] } : {}),
+      generationConfig: {
+        temperature: request.temperature,
+        maxOutputTokens: request.maxTokens,
+      },
+    };
+
+    const raw = (await this.post(
+      `${this.baseUrl}/v1beta/models/${this.model}:generateContent`,
+      {
+        'content-type': 'application/json',
+        // A header, never a `?key=` query parameter: a credential in a URL ends
+        // up in proxy logs, browser history and error messages.
+        'x-goog-api-key': this.apiKey,
+      },
+      body,
+      request.signal,
+    )) as {
+      candidates?: {
+        content?: {
+          parts?: { text?: string; functionCall?: { name?: string; args?: unknown } }[];
+        };
+        finishReason?: string;
+      }[];
+    };
+
+    const parts = raw.candidates?.[0]?.content?.parts ?? [];
+    const text = parts.map((part) => part.text ?? '').join('');
+
+    const toolCalls: LlmToolCall[] = parts
+      .filter((part) => part.functionCall !== undefined)
+      .map((part, index) => ({
+        id: encodeGeminiCallId(String(part.functionCall?.name ?? ''), index),
+        name: String(part.functionCall?.name ?? ''),
+        args: (part.functionCall?.args ?? {}) as Record<string, unknown>,
+      }));
+
+    return {
+      text,
+      toolCalls,
+      stopReason: geminiStop(raw.candidates?.[0]?.finishReason, toolCalls.length > 0),
+    };
+  }
+}
+
+/**
+ * A tool-call id that carries the tool's name.
+ *
+ * `#` rather than `:` because tool names never contain one, so the decode can
+ * split on the last occurrence without ambiguity.
+ */
+function encodeGeminiCallId(name: string, index: number): string {
+  return `${name}#${index}`;
+}
+
+function decodeGeminiCallName(id: string | undefined): string {
+  if (id === undefined) return '';
+  const hash = id.lastIndexOf('#');
+  return hash === -1 ? id : id.slice(0, hash);
+}
+
+function toGeminiContent(message: {
+  role: string;
+  content: string;
+  toolCalls?: readonly LlmToolCall[] | undefined;
+  toolCallId?: string | undefined;
+}): unknown {
+  if (message.role === 'tool') {
+    // Like Anthropic, a tool result rides on a user turn. Unlike Anthropic, it
+    // is matched by name - which is why the name had to survive the round trip
+    // inside the id.
+    return {
+      role: 'user',
+      parts: [
+        {
+          functionResponse: {
+            name: decodeGeminiCallName(message.toolCallId),
+            // The API expects an object, not a string. Tool output is already
+            // JSON, so it passes through when it parses and is wrapped when it
+            // does not: a result the model cannot read is worse than an
+            // oddly-shaped one.
+            response: asObject(message.content),
+          },
+        },
+      ],
+    };
+  }
+
+  if (message.role === 'assistant' && message.toolCalls?.length) {
+    const parts: unknown[] = [];
+    if (message.content) parts.push({ text: message.content });
+    for (const call of message.toolCalls) {
+      parts.push({ functionCall: { name: call.name, args: call.args } });
+    }
+    return { role: 'model', parts };
+  }
+
+  return {
+    role: message.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: message.content }],
+  };
+}
+
+function geminiStop(reason: string | undefined, calledTool: boolean): LlmStopReason {
+  // Checked first: Gemini reports STOP for a turn that asked for a tool, and
+  // treating that as end_turn would end the run a step early and record it as
+  // the agent deciding to stop.
+  if (calledTool) return 'tool_use';
+  return reason === 'MAX_TOKENS' ? 'max_tokens' : 'end_turn';
+}
+
+function hasProperties(schema: unknown): boolean {
+  if (schema === null || typeof schema !== 'object') return false;
+  const properties = (schema as { properties?: unknown }).properties;
+  return (
+    properties !== null &&
+    typeof properties === 'object' &&
+    Object.keys(properties as object).length > 0
+  );
+}
+
+function asObject(content: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return { result: parsed };
+  } catch {
+    return { result: content };
   }
 }
 

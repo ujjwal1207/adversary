@@ -67,7 +67,16 @@ what happened, with the full eight-rule trace behind every decision.
 
 `--agent scripted` is the default and needs no credentials, which is why CI can
 run the whole corpus and the determinism check on every push. `ops` and `naive`
-need a model; a recorded cassette replays one with no credentials at all.
+need a model — Gemini, Anthropic or OpenAI — and a recorded cassette replays one
+with no credentials at all.
+
+```bash
+cp .env.example .env      # then paste a key into it
+```
+
+`.env.example` lists every variable the project reads, all of them optional. A
+variable already set in your shell always beats the file, so
+`GEMINI_API_KEY=… pnpm adversary run …` overrides it rather than fighting it.
 
 ```bash
 pnpm adversary -- list-scenarios --family B
@@ -162,7 +171,7 @@ phase-to-architecture map.
 | 11 | CLI, demo, dashboard | **done** — clean-machine gate green in CI, not checkable locally |
 | 12 | Documentation and CI | **done** — five jobs, all passing |
 
-957 tests, 4 skipped. The four are the Postgres suite, which runs green in CI
+982 tests, 4 skipped. The four are the Postgres suite, which runs green in CI
 against a `postgres:16` service container and has never run on a developer
 machine here.
 
@@ -188,7 +197,7 @@ vague about its own.
 
 ```bash
 pnpm verify        # typecheck, lint, build, test — what CI runs
-pnpm test          # 957 tests, no services required
+pnpm test          # 982 tests, no services required
 pnpm db:migrate    # creates the five tables in ./adversary.sqlite
 ```
 

@@ -1,5 +1,5 @@
 /**
- * Model clients: cassettes and the two provider adapters.
+ * Model clients: cassettes and the three provider adapters.
  *
  * None of this touches a network. The adapters take an injected `fetch`,
  * because what an adapter gets wrong is almost never the HTTP - it is the
@@ -16,7 +16,7 @@ import type { LlmCompletion, LlmRequest } from '@adversary/core';
 import { ScriptedLlm, callsTool, says } from '@adversary/agents';
 
 import { CassetteError, CassetteLlm, cassetteKey } from '../cassette.js';
-import { AnthropicLlm, LlmError, OpenAiLlm } from '../providers.js';
+import { AnthropicLlm, GeminiLlm, LlmError, OpenAiLlm } from '../providers.js';
 import type { FetchLike } from '../providers.js';
 import { createLlmClient, llmConfigFromEnv, replayFromCassette } from '../index.js';
 
@@ -401,6 +401,202 @@ describe('OpenAiLlm', () => {
   });
 });
 
+describe('GeminiLlm', () => {
+  const body = {
+    candidates: [
+      {
+        content: {
+          role: 'model',
+          parts: [
+            { text: 'Paying now.' },
+            { functionCall: { name: 'pay_vendor', args: { vendorId: 'acct_vendor_acme' } } },
+          ],
+        },
+        finishReason: 'STOP',
+      },
+    ],
+  };
+
+  it('translates a completion', async () => {
+    const result = await new GeminiLlm({
+      apiKey: 'k',
+      model: 'gemini-2.5-flash',
+      fetchImpl: fakeFetch(body),
+    }).complete(REQUEST);
+
+    expect(result).toEqual<LlmCompletion>({
+      text: 'Paying now.',
+      // Gemini gives tool calls no id, so the adapter mints one carrying the
+      // name - which is how the result finds its way back to the right call.
+      toolCalls: [
+        { id: 'pay_vendor#0', name: 'pay_vendor', args: { vendorId: 'acct_vendor_acme' } },
+      ],
+      stopReason: 'tool_use',
+    });
+  });
+
+  it('reports tool_use even though Gemini says STOP', async () => {
+    // The difference that would break a run rather than a test. Gemini finishes
+    // with STOP whether it wrote prose or asked for a tool; taking that at face
+    // value would end the loop a step early and record it as the agent choosing
+    // to stop.
+    const result = await new GeminiLlm({ apiKey: 'k', model: 'm', fetchImpl: fakeFetch(body) })
+      .complete(REQUEST);
+    expect(result.stopReason).toBe('tool_use');
+  });
+
+  it('reports end_turn when nothing was called', async () => {
+    const prose = {
+      candidates: [{ content: { parts: [{ text: 'I cannot do that safely.' }] }, finishReason: 'STOP' }],
+    };
+    const result = await new GeminiLlm({ apiKey: 'k', model: 'm', fetchImpl: fakeFetch(prose) })
+      .complete(REQUEST);
+
+    expect(result.stopReason).toBe('end_turn');
+    expect(result.toolCalls).toEqual([]);
+  });
+
+  it('distinguishes two calls to the same tool in one turn', async () => {
+    // A bare name as the id would collapse these into one, and the second tool
+    // result would be matched to the first call.
+    const twice = {
+      candidates: [
+        {
+          content: {
+            parts: [
+              { functionCall: { name: 'pay_vendor', args: { amountPaise: 1 } } },
+              { functionCall: { name: 'pay_vendor', args: { amountPaise: 2 } } },
+            ],
+          },
+          finishReason: 'STOP',
+        },
+      ],
+    };
+
+    const result = await new GeminiLlm({ apiKey: 'k', model: 'm', fetchImpl: fakeFetch(twice) })
+      .complete(REQUEST);
+
+    expect(result.toolCalls.map((c) => c.id)).toEqual(['pay_vendor#0', 'pay_vendor#1']);
+  });
+
+  it('sends the tool result back under the tool name, recovered from the id', async () => {
+    const fetchImpl = fakeFetch(body);
+    await new GeminiLlm({ apiKey: 'k', model: 'm', fetchImpl }).complete({
+      ...REQUEST,
+      messages: [
+        { role: 'user', content: 'Pay them.' },
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [{ id: 'pay_vendor#0', name: 'pay_vendor', args: {} }],
+        },
+        { role: 'tool', content: '{"ok":true}', toolCallId: 'pay_vendor#0' },
+      ],
+    });
+
+    const sent = (fetchImpl.calls[0] as { body: { contents: Record<string, unknown>[] } }).body;
+
+    // The assistant turn is `model`, not `assistant`.
+    expect(sent.contents[1]).toEqual({
+      role: 'model',
+      parts: [{ functionCall: { name: 'pay_vendor', args: {} } }],
+    });
+
+    // The result rides on a user turn, matched by name, with an object payload.
+    expect(sent.contents[2]).toEqual({
+      role: 'user',
+      parts: [{ functionResponse: { name: 'pay_vendor', response: { ok: true } } }],
+    });
+  });
+
+  it('wraps a tool result that is not JSON rather than dropping it', async () => {
+    const fetchImpl = fakeFetch(body);
+    await new GeminiLlm({ apiKey: 'k', model: 'm', fetchImpl }).complete({
+      ...REQUEST,
+      messages: [{ role: 'tool', content: 'not json at all', toolCallId: 'pay_vendor#0' }],
+    });
+
+    const sent = (fetchImpl.calls[0] as { body: { contents: { parts: unknown[] }[] } }).body;
+    expect(sent.contents[0]?.parts[0]).toEqual({
+      functionResponse: { name: 'pay_vendor', response: { result: 'not json at all' } },
+    });
+  });
+
+  it('omits parameters for a tool that takes none', async () => {
+    // The API rejects an empty property bag. Three of this project's read tools
+    // take no arguments, so this is the common case rather than a corner.
+    const fetchImpl = fakeFetch(body);
+    await new GeminiLlm({ apiKey: 'k', model: 'm', fetchImpl }).complete(REQUEST);
+
+    const sent = (
+      fetchImpl.calls[0] as { body: { tools: { functionDeclarations: object[] }[] } }
+    ).body;
+    expect(sent.tools[0]?.functionDeclarations[0]).toEqual({
+      name: 'pay_vendor',
+      description: 'Send a payment to a vendor. This moves money.',
+    });
+  });
+
+  it('keeps parameters for a tool that takes some', async () => {
+    const fetchImpl = fakeFetch(body);
+    const parameters = {
+      type: 'object',
+      properties: { vendorId: { type: 'string' } },
+      required: ['vendorId'],
+    };
+
+    await new GeminiLlm({ apiKey: 'k', model: 'm', fetchImpl }).complete({
+      ...REQUEST,
+      tools: [{ name: 'pay_vendor', description: 'Pays.', parameters }],
+    });
+
+    const sent = (
+      fetchImpl.calls[0] as { body: { tools: { functionDeclarations: { parameters?: unknown }[] }[] } }
+    ).body;
+    expect(sent.tools[0]?.functionDeclarations[0]?.parameters).toEqual(parameters);
+  });
+
+  it('sends the key as a header, never in the URL', async () => {
+    // A credential in a query string ends up in proxy logs, browser history and
+    // error messages. This is the one place the adapter could get that wrong.
+    const fetchImpl = fakeFetch(body);
+    await new GeminiLlm({ apiKey: 'super-secret', model: 'm', fetchImpl }).complete(REQUEST);
+
+    const call = fetchImpl.calls[0] as { url: string; headers: Record<string, string> };
+    expect(call.url).not.toContain('super-secret');
+    expect(call.url).not.toContain('key=');
+    expect(call.headers['x-goog-api-key']).toBe('super-secret');
+  });
+
+  it('produces the same shape as the other two adapters', async () => {
+    // The parity that makes "model-agnostic" a checked claim rather than an
+    // aspiration. Three wire formats, one completion object.
+    const anthropic = await new AnthropicLlm({
+      apiKey: 'k',
+      model: 'm',
+      fetchImpl: fakeFetch({
+        content: [{ type: 'tool_use', id: 'pay_vendor#0', name: 'pay_vendor', input: { a: 1 } }],
+        stop_reason: 'tool_use',
+      }),
+    }).complete(REQUEST);
+
+    const gemini = await new GeminiLlm({
+      apiKey: 'k',
+      model: 'm',
+      fetchImpl: fakeFetch({
+        candidates: [
+          {
+            content: { parts: [{ functionCall: { name: 'pay_vendor', args: { a: 1 } } }] },
+            finishReason: 'STOP',
+          },
+        ],
+      }),
+    }).complete(REQUEST);
+
+    expect(gemini).toEqual(anthropic);
+  });
+});
+
 describe('failure handling', () => {
   it('retries a rate limit a bounded number of times', async () => {
     const fetchImpl = fakeFetch({ error: 'rate limited' }, 429);
@@ -471,6 +667,21 @@ describe('llmConfigFromEnv', () => {
     expect(llmConfigFromEnv({ OPENAI_API_KEY: 'b', ADVERSARY_MODEL: 'gpt-x' })?.model).toBe(
       'gpt-x',
     );
+  });
+
+  it('accepts a Gemini key under either of the names Google publishes', () => {
+    // The console hands out one or the other depending on where you got it.
+    expect(llmConfigFromEnv({ GEMINI_API_KEY: 'g' })?.provider).toBe('gemini');
+    expect(llmConfigFromEnv({ GOOGLE_API_KEY: 'g' })?.provider).toBe('gemini');
+    expect(llmConfigFromEnv({ GEMINI_API_KEY: 'g' })?.model).toBe('gemini-2.5-flash');
+  });
+
+  it('checks the three providers in a fixed order', () => {
+    // Documented rather than clever. Setting two keys is usually a mistake, and
+    // a stable order at least makes the mistake reproducible.
+    const all = { ANTHROPIC_API_KEY: 'a', OPENAI_API_KEY: 'b', GEMINI_API_KEY: 'g' };
+    expect(llmConfigFromEnv(all)?.provider).toBe('anthropic');
+    expect(llmConfigFromEnv({ OPENAI_API_KEY: 'b', GEMINI_API_KEY: 'g' })?.provider).toBe('openai');
   });
 
   it('refuses a cassette path with no mode rather than guessing', () => {

@@ -41,10 +41,20 @@ what is tested. The tool names are plausible defaults, not confirmed ones.
 
 ### The model adapters have never talked to a model
 
-Same situation. `AnthropicLlm` and `OpenAiLlm` are implemented from published
-API shapes and tested against an injected `fetch`. A test asserts both produce an
-identical completion object from their respective wire formats, which checks the
-translation but not the HTTP contract.
+Same situation. `AnthropicLlm`, `OpenAiLlm` and `GeminiLlm` are implemented from
+published API shapes and tested against an injected `fetch`. A test asserts all
+three produce an identical completion object from their respective wire formats,
+which checks the translation but not the HTTP contract.
+
+Gemini is the one to watch, because it is the one whose wire format differs
+structurally rather than cosmetically. It gives tool calls no id, so the adapter
+mints `name#index` and decodes the name back out when the result returns; it
+reports `STOP` even on a turn that asked for a tool, so the stop reason is
+derived from whether a function call came back; it calls the assistant `model`;
+and it rejects both an empty `parameters` object and an empty `tools` array, so
+each is omitted rather than sent. Every one of those is asserted against a
+canned response. None has been confirmed against Google's servers, and a wrong
+guess about any of them would show up as a 400 on the first real call.
 
 ### `Ops` and `NaiveOps` have never run against a real model
 
