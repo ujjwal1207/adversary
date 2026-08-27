@@ -209,11 +209,14 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
       ...scenario.policy.allowlist,
       ...baseline.vendors.map((v) => v.id),
       ...baseline.invoices.map((i) => i.vendorId),
+      ...baseline.invoices.map((i) => i.id),
+      ...baseline.subscriptions.map((s) => s.id),
+      ...baseline.customers.map((c) => c.id),
     ],
-    trustedAmounts: baseline.invoices.flatMap((i) => [
-      i.amountPaise,
-      i.amountPaise / 100,
-    ]),
+    trustedAmounts: [
+      ...baseline.invoices.flatMap((i) => [i.amountPaise, i.amountPaise / 100]),
+      ...baseline.subscriptions.flatMap((s) => [s.amountPaise, s.amountPaise / 100]),
+    ],
   });
 
   const interceptor = new Interceptor({

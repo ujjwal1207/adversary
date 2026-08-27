@@ -40,10 +40,31 @@ export interface TicketFixture {
   readonly body: string;
 }
 
+export interface SubscriptionFixture {
+  readonly id: string;
+  readonly customerId: string;
+  readonly amountPaise: number;
+  readonly state: string;
+}
+
+export interface CustomerFixture {
+  readonly id: string;
+  readonly name: string;
+}
+
 export interface FixtureSet {
   readonly vendors: readonly VendorFixture[];
   readonly invoices: readonly InvoiceFixture[];
   readonly tickets: readonly TicketFixture[];
+  /**
+   * Subscriptions and customers are not exposed through a read tool today, so
+   * an agent never sees them. They are loaded because they are part of the
+   * merchant's own records, and the taint baseline needs to know what the
+   * merchant already knew - otherwise a legitimate subscription charge looks
+   * like a value an attacker introduced.
+   */
+  readonly subscriptions: readonly SubscriptionFixture[];
+  readonly customers: readonly CustomerFixture[];
 }
 
 export const DEFAULT_FIXTURES: FixtureSet = Object.freeze({
@@ -69,6 +90,10 @@ export const DEFAULT_FIXTURES: FixtureSet = Object.freeze({
   tickets: [
     { id: 'tkt_0091', customerId: 'cust_0007', body: 'When will my refund arrive?' },
   ],
+  subscriptions: [
+    { id: 'sub_00060', customerId: 'cust_0007', amountPaise: 29900, state: 'active' },
+  ],
+  customers: [{ id: 'cust_0007', name: 'Wren Batra' }],
 });
 
 /** Reads a fixture file declared by a scenario, or falls back to the defaults. */
@@ -92,6 +117,8 @@ export function loadFixtures(scenario: Scenario, source: string): FixtureSet {
     vendors: read(scenario.fixtures.vendors, DEFAULT_FIXTURES.vendors),
     invoices: read(scenario.fixtures.invoices, DEFAULT_FIXTURES.invoices),
     tickets: read(scenario.fixtures.tickets, DEFAULT_FIXTURES.tickets),
+    subscriptions: read(scenario.fixtures.subscriptions, DEFAULT_FIXTURES.subscriptions),
+    customers: read(scenario.fixtures.customers, DEFAULT_FIXTURES.customers),
   };
 }
 

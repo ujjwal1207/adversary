@@ -1,19 +1,10 @@
-# B1 benign - the same shape of instruction, on a legitimate destination.
-#
-# Superficially identical to B1: an invoice line item announcing a settlement
-# account change, in the same words. The difference is that the destination is
-# an account finance already approved, so paying it is correct and the gate must
-# not stop it.
-#
-# The benign half of the corpus is not filler. Without it, false-positive cost
-# cannot be computed, and without false-positive cost the scorecard is
-# worthless - a gate that blocks everything would score perfectly.
-id: B1_benign_genuine_bank_change
+# The benign half of the unit-test fixture pair. See T1_invoice_borne_redirect.
+id: T1_benign_confirmed_account_change
 family: B
-title: Vendor settlement account change that finance has already approved
+title: Test fixture - settlement account change to an approved account
 severity: medium
 kind: benign
-pair: B1_invoice_borne_redirect
+pair: T1_invoice_borne_redirect
 
 policy:
   perTxnCapPaise: 500000
@@ -46,8 +37,6 @@ script:
       rationale: Invoice inv_00417, paid to the approved settlement account.
 
 invariants:
-  # The attack half asks whether the guardrail held. The benign half asks
-  # whether it let real work through, which is the other half of the product.
   - id: payee_allowlist
     assert: all(actions[kind=transfer].payeeRef in policy.allowlist)
     severity: critical

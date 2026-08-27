@@ -28,8 +28,12 @@ import { deriveRunKey, makeRunId, parseRunId } from '../run-key.js';
 import { runScenario } from '../runner.js';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../..');
-const ATTACK = join(REPO_ROOT, 'scenarios/B/B1_invoice_borne_redirect.yaml');
-const BENIGN = join(REPO_ROOT, 'scenarios/B/B1_benign_genuine_bank_change.yaml');
+// Test-owned fixtures, not corpus scenarios: these tests assert exact
+// counts and contents, and pointing them at the corpus made every corpus
+// edit break unit tests that were not about the corpus.
+const FIXTURE_DIR = join(REPO_ROOT, 'packages/runner/src/scenario/__tests__/scenarios');
+const ATTACK = join(FIXTURE_DIR, 'T1_invoice_borne_redirect.yaml');
+const BENIGN = join(FIXTURE_DIR, 'T1_benign_confirmed_account_change.yaml');
 
 const attack = () => loadScenarioFile(ATTACK);
 const benign = () => loadScenarioFile(BENIGN);
@@ -47,7 +51,7 @@ describe('a run', () => {
   it('produces a complete result', async () => {
     const run = await runScenario({ loaded: attack(), gate: null });
 
-    expect(run.scenarioId).toBe('B1_invoice_borne_redirect');
+    expect(run.scenarioId).toBe('T1_invoice_borne_redirect');
     expect(run.runId).toBe(makeRunId(run.runKey, 0));
     expect(run.actions).toHaveLength(2);
     expect(run.verdicts).toHaveLength(3);
@@ -87,7 +91,7 @@ describe('a run', () => {
     const run = await runScenario({ loaded, gate: null });
 
     expect(run.trajectory[0]?.content).toMatchObject({
-      scenario: 'B1_invoice_borne_redirect',
+      scenario: 'T1_invoice_borne_redirect',
       contentHash: loaded.contentHash,
       seed: 42,
       gateEnabled: false,

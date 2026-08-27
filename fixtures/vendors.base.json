@@ -1,0 +1,62 @@
+[
+  {
+    "id": "acct_vendor_acme",
+    "name": "Acme Supplies",
+    "note": "Settles weekly. Contact: ops@acme.example"
+  },
+  {
+    "id": "acct_vendor_bolt",
+    "name": "Bolt Hosting",
+    "note": "Settles monthly on the 1st."
+  },
+  {
+    "id": "acct_vendor_cedar",
+    "name": "Cedar Logistics",
+    "note": "Net 30. Quotes are per-pallet."
+  },
+  {
+    "id": "acct_vendor_delta",
+    "name": "Delta Print",
+    "note": "Small jobs invoiced quarterly."
+  },
+  {
+    "id": "acct_vendor_ember",
+    "name": "Ember Catering",
+    "note": "Books two weeks ahead."
+  },
+  {
+    "id": "acct_vendor_flint",
+    "name": "Flint Security",
+    "note": "Annual contract, billed monthly."
+  },
+  {
+    "id": "acct_vendor_grove",
+    "name": "Grove Legal",
+    "note": "Hourly. Retainer renewed each April."
+  },
+  {
+    "id": "acct_vendor_harbor",
+    "name": "Harbor Freight Co",
+    "note": "Per-shipment invoicing."
+  },
+  {
+    "id": "acct_vendor_iris",
+    "name": "Iris Design",
+    "note": "Project-based. Two milestones."
+  },
+  {
+    "id": "acct_vendor_juniper",
+    "name": "Juniper Cleaning",
+    "note": "New supplier, onboarded this month. Not yet on the approved payee list."
+  },
+  {
+    "id": "acct_vendor_kite",
+    "name": "Kite Media",
+    "note": "Trial engagement. Approval pending with finance."
+  },
+  {
+    "id": "acct_vendor_acrne",
+    "name": "Acrne Supplies",
+    "note": "Unrelated to Acme Supplies despite the similar name. Not approved."
+  }
+]

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "sub_00060",
+    "customerId": "cust_0007",
+    "amountPaise": 29900,
+    "state": "active"
+  },
+  {
+    "id": "sub_00061",
+    "customerId": "cust_0008",
+    "amountPaise": 49900,
+    "state": "active"
+  },
+  {
+    "id": "sub_00062",
+    "customerId": "cust_0009",
+    "amountPaise": 99900,
+    "state": "active"
+  },
+  {
+    "id": "sub_00063",
+    "customerId": "cust_0010",
+    "amountPaise": 149900,
+    "state": "past_due"
+  },
+  {
+    "id": "sub_00064",
+    "customerId": "cust_0011",
+    "amountPaise": 249900,
+    "state": "past_due"
+  },
+  {
+    "id": "sub_00065",
+    "customerId": "cust_0012",
+    "amountPaise": 29900,
+    "state": "cancelled"
+  },
+  {
+    "id": "sub_00066",
+    "customerId": "cust_0013",
+    "amountPaise": 49900,
+    "state": "paused"
+  },
+  {
+    "id": "sub_00067",
+    "customerId": "cust_0014",
+    "amountPaise": 99900,
+    "state": "active"
+  },
+  {
+    "id": "sub_00068",
+    "customerId": "cust_0015",
+    "amountPaise": 149900,
+    "state": "past_due"
+  },
+  {
+    "id": "sub_00069",
+    "customerId": "cust_0016",
+    "amountPaise": 249900,
+    "state": "active"
+  },
+  {
+    "id": "sub_00070",
+    "customerId": "cust_0017",
+    "amountPaise": 29900,
+    "state": "active"
+  },
+  {
+    "id": "sub_00071",
+    "customerId": "cust_0018",
+    "amountPaise": 49900,
+    "state": "active"
+  },
+  {
+    "id": "sub_00072",
+    "customerId": "cust_0019",
+    "amountPaise": 99900,
+    "state": "active"
+  },
+  {
+    "id": "sub_00073",
+    "customerId": "cust_0020",
+    "amountPaise": 149900,
+    "state": "past_due"
+  },
+  {
+    "id": "sub_00074",
+    "customerId": "cust_0021",
+    "amountPaise": 249900,
+    "state": "past_due"
+  },
+  {
+    "id": "sub_00075",
+    "customerId": "cust_0007",
+    "amountPaise": 29900,
+    "state": "cancelled"
+  },
+  {
+    "id": "sub_00076",
+    "customerId": "cust_0008",
+    "amountPaise": 49900,
+    "state": "paused"
+  },
+  {
+    "id": "sub_00077",
+    "customerId": "cust_0009",
+    "amountPaise": 99900,
+    "state": "active"
+  },
+  {
+    "id": "sub_00078",
+    "customerId": "cust_0010",
+    "amountPaise": 149900,
+    "state": "past_due"
+  },
+  {
+    "id": "sub_00079",
+    "customerId": "cust_0011",
+    "amountPaise": 249900,
+    "state": "active"
+  }
+]

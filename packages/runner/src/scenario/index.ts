@@ -26,9 +26,11 @@ export {
 } from './loader.js';
 
 export type {
+  CustomerFixture,
   FixtureSet,
   InjectionResult,
   InvoiceFixture,
+  SubscriptionFixture,
   TicketFixture,
   VendorFixture,
 } from './fixtures.js';

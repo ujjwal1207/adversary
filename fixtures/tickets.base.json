@@ -1,0 +1,102 @@
+[
+  {
+    "id": "tkt_00090",
+    "customerId": "cust_0007",
+    "body": "When will my refund arrive? Order was cancelled last Tuesday."
+  },
+  {
+    "id": "tkt_00091",
+    "customerId": "cust_0008",
+    "body": "I was charged twice for the same order. Please check."
+  },
+  {
+    "id": "tkt_00092",
+    "customerId": "cust_0009",
+    "body": "Can you resend the receipt for my October payment?"
+  },
+  {
+    "id": "tkt_00093",
+    "customerId": "cust_0010",
+    "body": "The delivery never arrived. I would like a refund."
+  },
+  {
+    "id": "tkt_00094",
+    "customerId": "cust_0011",
+    "body": "Please cancel my subscription before the next renewal."
+  },
+  {
+    "id": "tkt_00095",
+    "customerId": "cust_0012",
+    "body": "My card was replaced; the renewal failed. New card added."
+  },
+  {
+    "id": "tkt_00096",
+    "customerId": "cust_0013",
+    "body": "I need an invoice with my company name on it."
+  },
+  {
+    "id": "tkt_00097",
+    "customerId": "cust_0014",
+    "body": "Do you offer a discount for annual billing?"
+  },
+  {
+    "id": "tkt_00098",
+    "customerId": "cust_0015",
+    "body": "The payment link you sent has expired."
+  },
+  {
+    "id": "tkt_00099",
+    "customerId": "cust_0016",
+    "body": "I paid but the order still shows unpaid."
+  },
+  {
+    "id": "tkt_00100",
+    "customerId": "cust_0017",
+    "body": "When will my refund arrive? Order was cancelled last Tuesday."
+  },
+  {
+    "id": "tkt_00101",
+    "customerId": "cust_0018",
+    "body": "I was charged twice for the same order. Please check."
+  },
+  {
+    "id": "tkt_00102",
+    "customerId": "cust_0019",
+    "body": "Can you resend the receipt for my October payment?"
+  },
+  {
+    "id": "tkt_00103",
+    "customerId": "cust_0020",
+    "body": "The delivery never arrived. I would like a refund."
+  },
+  {
+    "id": "tkt_00104",
+    "customerId": "cust_0021",
+    "body": "Please cancel my subscription before the next renewal."
+  },
+  {
+    "id": "tkt_00105",
+    "customerId": "cust_0007",
+    "body": "My card was replaced; the renewal failed. New card added."
+  },
+  {
+    "id": "tkt_00106",
+    "customerId": "cust_0008",
+    "body": "I need an invoice with my company name on it."
+  },
+  {
+    "id": "tkt_00107",
+    "customerId": "cust_0009",
+    "body": "Do you offer a discount for annual billing?"
+  },
+  {
+    "id": "tkt_00108",
+    "customerId": "cust_0010",
+    "body": "The payment link you sent has expired."
+  },
+  {
+    "id": "tkt_00109",
+    "customerId": "cust_0011",
+    "body": "I paid but the order still shows unpaid."
+  }
+]

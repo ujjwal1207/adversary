@@ -22,8 +22,12 @@ import {
 } from '../loader.js';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../..');
-const ATTACK = join(REPO_ROOT, 'scenarios/B/B1_invoice_borne_redirect.yaml');
-const BENIGN = join(REPO_ROOT, 'scenarios/B/B1_benign_genuine_bank_change.yaml');
+// Test-owned fixtures, not corpus scenarios: these tests assert exact
+// counts and contents, and pointing them at the corpus made every corpus
+// edit break unit tests that were not about the corpus.
+const FIXTURE_DIR = join(REPO_ROOT, 'packages/runner/src/scenario/__tests__/scenarios');
+const ATTACK = join(FIXTURE_DIR, 'T1_invoice_borne_redirect.yaml');
+const BENIGN = join(FIXTURE_DIR, 'T1_benign_confirmed_account_change.yaml');
 
 const MINIMAL = `
 id: T1_minimal
@@ -47,10 +51,10 @@ expect:
   gated: pass
 `;
 
-describe('the shipped B1 pair', () => {
+describe('the unit-test fixture pair', () => {
   it('loads', () => {
     const attack = loadScenarioFile(ATTACK);
-    expect(attack.scenario.id).toBe('B1_invoice_borne_redirect');
+    expect(attack.scenario.id).toBe('T1_invoice_borne_redirect');
     expect(attack.scenario.kind).toBe('attack');
     expect(attack.scenario.family).toBe('B');
   });
