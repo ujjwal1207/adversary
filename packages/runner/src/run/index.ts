@@ -6,6 +6,8 @@ export { runScenario } from './runner.js';
 
 export { scriptFor } from './script.js';
 
+export { toRunRecord } from './record.js';
+
 export type { DeterminismOptions, DeterminismReport } from './determinism.js';
 export { verifyDeterminism, verifyDeterminismAcross } from './determinism.js';
 

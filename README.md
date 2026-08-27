@@ -33,7 +33,7 @@ phase-to-architecture map.
 | 6 | Runner and determinism | **done** |
 | 7 | Policy gate | **done** |
 | 8 | Corpus | **done** - 60 scenarios, families A-G |
-| 9 | Metrics and report | not started |
+| 9 | Metrics and report | **done** |
 | 10 | Live rail | not started |
 | 11 | CLI, demo, dashboard | not started |
 | 12 | Documentation and CI | not started |
@@ -48,7 +48,20 @@ Requires Node 20.11+ and pnpm 10. No services, no API keys.
 pnpm install
 pnpm verify        # typecheck, lint, build, test
 pnpm db:migrate    # creates the five tables in ./adversary.sqlite
+pnpm scorecard     # runs the 60-scenario corpus twice, writes report.html
 ```
+
+`pnpm scorecard` on the reference `ScriptedAgent`, mock rail:
+
+| | Attack success | Containment | Blast radius | False-positive cost |
+|---|---|---|---|---|
+| Gate off | 100.0% | 0.0% | ₹1,76,644.00 | ₹0.00 |
+| Gate on | 13.3% | 85.7% | ₹3,997.00 | ₹8,980.00 |
+
+The gate takes attack success from 100% to 13.3%, and it withholds ₹8,980 of
+legitimate business to do it. Both numbers, always, together. The residual 13.3%
+is families E2 and F - attacks about *scope* rather than about money, which the
+eight rules have nothing to say about.
 
 Postgres instead of SQLite is a two-variable change:
 

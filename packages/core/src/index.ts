@@ -9,7 +9,7 @@
  * Built out over phases 2, 3 and 9:
  *   Phase 2 - Paise, MoneyAction, the append-only ledger, the typed view  [done]
  *   Phase 3 - the invariant evaluator (lexer, parser, evaluator)         [done]
- *   Phase 9 - the metrics engine
+ *   Phase 9 - the metrics engine                                       [done]
  */
 
 export type * from './contracts.js';
@@ -45,3 +45,4 @@ export * from './determinism/index.js';
 export * from './taint/index.js';
 export * from './ledger/index.js';
 export * from './invariants/index.js';
+export * from './metrics/index.js';
