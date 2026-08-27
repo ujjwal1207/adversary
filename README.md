@@ -192,6 +192,12 @@ pnpm test          # 957 tests, no services required
 pnpm db:migrate    # creates the five tables in ./adversary.sqlite
 ```
 
+`node scripts/build-architecture-page.mjs out.html` renders
+`docs/ARCHITECTURE.md` as a standalone page. A script rather than a
+hand-conversion, because the failure mode is staleness: a published copy drifted
+from the document once already, and regenerating has to be cheap enough that
+nobody weighs whether it is worth doing.
+
 ## Safety boundary
 
 This is a defensive security-testing tool. Every scenario is a test fixture run
