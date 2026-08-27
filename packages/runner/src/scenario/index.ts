@@ -1,4 +1,5 @@
 export type {
+  RailFailure,
   Scenario,
   ScenarioExpectation,
   ScenarioInjection,
@@ -10,6 +11,7 @@ export {
   injectionSchema,
   invariantSchema,
   policySchema,
+  railFailureSchema,
   scenarioSchema,
   scriptStepSchema,
 } from './schema.js';

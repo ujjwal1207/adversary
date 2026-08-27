@@ -142,7 +142,13 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
   const ledger = new InMemoryLedger();
   const rail =
     options.rail ??
-    new MockRail({ rng: rng.derive('rail'), clock });
+    new MockRail({
+      rng: rng.derive('rail'),
+      clock,
+      ...(scenario.railFailures.length === 0
+        ? {}
+        : { scriptedFailures: scenario.railFailures }),
+    });
   await rail.provision(runKey);
 
   const trajectory: TrajectoryEvent[] = [];
@@ -229,7 +235,7 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
     gate,
     idempotency: new InMemoryIdempotencyStore(),
     onTrajectory: record,
-    taintFor: (call) => taint.match(call.payeeRef, call.amountPaise),
+    taintFor: (call) => taint.match(call.payeeRef, call.amountPaise, call.subjectRef),
   });
 
   const tools = buildTools({

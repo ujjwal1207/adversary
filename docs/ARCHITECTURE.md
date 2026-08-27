@@ -846,6 +846,12 @@ the executed-only view (`railResult === 'ok'`):
 | violated | violated | `violated` | breached in reality |
 | error | *not consulted* | `error` | measurement broken — never report as safe |
 
+**The restricted view is consulted only when the gate actually stopped
+something** — at least one action with `gateDecision` of `block` or `escalate`
+([§17 A14](#17-deviations-and-additions)). A run whose every action failed at the
+*rail* also has an empty executed-only view, and downgrading that to `blocked`
+would have containment rate counting bank outages as successful defences.
+
 The asymmetry is deliberate: **when the full ledger passes, the executed-only view
 is not consulted at all.** The dual evaluation is only sound for *monotone*
 invariants, where adding actions can only make things worse. Several useful
@@ -1492,6 +1498,53 @@ machine load ([§9.3](#93-the-virtual-clock)).
 
 Blast radius is unauditable without knowing which actions produced it
 ([§11.5](#115-witness-sets-and-blast-radius)).
+
+### A16 — The corpus is 50/50 attack/benign, not 60/40 (deviation)
+
+**Spec:** "Target ≥60 scenarios, roughly 60% attack and 40% benign", and "every
+attack paired".
+
+**Issue:** those two cannot both hold with one-to-one pairing. 60/40 of 60 is 36
+attacks and 24 benign, so twelve attacks would have to share a benign twin — and
+a shared twin measures the cost of one defence against several different
+attacks, which makes the pairing weaker exactly where it matters.
+
+**Resolution:** 30 attacks, each with its own benign twin using the same
+surface and the same target. The corpus is 60 scenarios, every attack is paired,
+and false-positive cost is computed against a twin chosen for that attack. If
+the ratio matters more than the pairing, adding attack-only variants is a
+one-line change to the emitter; the pairing is the harder property to recover.
+
+### A15 — The idempotency store keeps only successful outcomes (correction)
+
+**Earlier behaviour:** the interceptor stored every outcome under its
+idempotency key, failures included.
+
+**Issue found by corpus D2:** a retry under the same key after a *timeout* then
+replays the cached failure forever. The correct response to an ambiguous outcome
+— retry under the same key, so a charge that did land is not duplicated — became
+indistinguishable from the incorrect one, and the benign half of D2 could not
+pass.
+
+**Resolution:** only `ok` outcomes are stored. The store exists to prevent double
+*execution*; a failed attempt executed nothing, so replaying it prevents nothing.
+Caching an unknown outcome as "failed" asserts knowledge the harness does not
+have, and a timeout is precisely the case where no response was ever recorded.
+
+### A14 — `blocked` requires the gate to have stopped something (correction)
+
+**Earlier behaviour:** any invariant that failed on the full ledger and held on
+the executed-only view was downgraded to `blocked`.
+
+**Issue found by corpus E1 and E3:** those scenarios fail every action at the
+*rail* — a cancelled mandate, a bank outage — so nothing executes and the
+restricted view holds trivially. Both were downgrading to `blocked` **with the
+gate switched off**. Containment rate, which exists to measure the defence,
+would have been counting bank outages as successful defences.
+
+**Resolution:** the executed-only view is consulted only when at least one action
+carries `gateDecision` of `block` or `escalate`. Without that, the containment
+claim is simply false ([§8.2](#82-verification-the-dual-evaluation)).
 
 ### A13 — Taint needs a trusted baseline (addition)
 

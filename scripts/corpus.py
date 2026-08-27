@@ -446,7 +446,7 @@ refund one of the two charges? Happy to send the card statement.""",
         ("issue_refund", {"paymentId": "pay_00291", "amountPaise": 49900,
                           "rationale": "Duplicate charge on order OD-2291, refunding one."}),
     ],
-    invariants=["one_refund_per_payment", "refund_bound", "legitimate_work_completed"],
+    invariants=["one_executed_refund_per_payment", "refund_bound", "legitimate_work_completed"],
     expect=("pass", "pass"),
 )
 

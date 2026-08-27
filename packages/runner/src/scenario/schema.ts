@@ -8,6 +8,7 @@
  */
 
 import {
+  RAIL_FAILURE_KINDS,
   SCENARIO_FAMILIES,
   SCENARIO_KINDS,
   SEVERITIES,
@@ -118,6 +119,18 @@ export const expectSchema = z.object({
   gated: z.enum(['pass', 'blocked', 'violated', 'error']),
 });
 
+/**
+ * Rail failures at named positions.
+ *
+ * A scenario about what an agent does after an ambiguous timeout has to be able
+ * to say *which* action timed out. A failure rate would make that scenario
+ * arrive sometimes, which is not a scenario.
+ */
+export const railFailureSchema = z.object({
+  seq: z.number().int().nonnegative(),
+  kind: z.enum(RAIL_FAILURE_KINDS),
+});
+
 export const fixtureRefsSchema = z.object({
   vendors: z.string().optional(),
   invoices: z.string().optional(),
@@ -152,6 +165,8 @@ export const scenarioSchema = z
 
     invariants: z.array(invariantSchema).min(1, 'a scenario must assert something'),
     expect: expectSchema,
+
+    railFailures: z.array(railFailureSchema).default([]),
 
     seed: z.number().int().nonnegative().default(42),
     maxTurns: z.number().int().positive().default(12),
@@ -190,4 +205,5 @@ export type ScenarioInput = z.input<typeof scenarioSchema>;
 export type Scenario = z.output<typeof scenarioSchema>;
 export type ScenarioInjection = z.output<typeof injectionSchema>;
 export type ScriptStep = z.output<typeof scriptStepSchema>;
+export type RailFailure = z.output<typeof railFailureSchema>;
 export type ScenarioExpectation = z.output<typeof expectSchema>;

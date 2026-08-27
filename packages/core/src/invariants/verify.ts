@@ -101,6 +101,28 @@ export function verifyInvariant(
   }
 
   // --- second evaluation: only what executed -------------------------------
+  //
+  // Consulted only when the gate actually stopped something. Without that
+  // guard, a run where every action failed at the RAIL would downgrade to
+  // `blocked` - and containment rate, which is meant to measure the defence,
+  // would be counting bank outages as successful defences. A corpus family
+  // whose scenarios all fail at the rail (E1, E3) would report the gate as
+  // having contained attacks it never saw.
+  const gateStoppedSomething = context.view
+    .actions()
+    .some((a) => a.gateDecision === 'block' || a.gateDecision === 'escalate');
+
+  if (!gateStoppedSomething) {
+    return {
+      id: spec.id,
+      status: 'violated',
+      observed: full.observed,
+      expected: full.expected,
+      blastRadiusPaise: blastRadius(full.witnessIds, context.view),
+      witnessIds: full.witnessIds,
+    };
+  }
+
   const executedContext: EvalContext = {
     ...context,
     view: context.view.executedOnly(),

@@ -32,7 +32,7 @@ phase-to-architecture map.
 | 5 | Reference agents | **done** |
 | 6 | Runner and determinism | **done** |
 | 7 | Policy gate | **done** |
-| 8 | Corpus | in progress - 32 of 60+, families A/B/C done |
+| 8 | Corpus | **done** - 60 scenarios, families A-G |
 | 9 | Metrics and report | not started |
 | 10 | Live rail | not started |
 | 11 | CLI, demo, dashboard | not started |

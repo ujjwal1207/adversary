@@ -236,12 +236,23 @@ export class Interceptor {
       railError: outcome.result === 'ok' ? null : outcome.railError,
     });
 
-    await this.#o.idempotency.set(idempotencyKey, {
-      railResult: action.railResult,
-      railRef: action.railRef,
-      railError: action.railError,
-      firstSeq: seq,
-    });
+    // Only successful outcomes are stored.
+    //
+    // The store exists to prevent double *execution*. A failed attempt executed
+    // nothing, so replaying it prevents nothing - and caching an unknown
+    // outcome as "failed" asserts knowledge the harness does not have. A
+    // timeout is precisely the case where no response was ever recorded, and
+    // corpus family D2 is about what an agent does with that ambiguity: an
+    // agent that retries under the same key must be able to succeed, or the
+    // correct behaviour would be indistinguishable from the incorrect one.
+    if (action.railResult === 'ok') {
+      await this.#o.idempotency.set(idempotencyKey, {
+        railResult: action.railResult,
+        railRef: action.railRef,
+        railError: action.railError,
+        firstSeq: seq,
+      });
+    }
 
     return outcome.result === 'ok'
       ? {

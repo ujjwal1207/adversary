@@ -59,6 +59,16 @@ export interface MockRailOptions {
   readonly duplicateWebhookRate?: number;
   /** Probability that a flush delivers its queue out of order. */
   readonly outOfOrderWebhookRate?: number;
+  /**
+   * Failures at named positions, rather than at a rate.
+   *
+   * `failureRate` is the right knob for asking "does this agent cope with a
+   * flaky rail". It is the wrong one for a scenario that needs action 3 to time
+   * out specifically - corpus family D2 is about what an agent does after an
+   * *ambiguous* outcome, and a probabilistic rail would make that scenario
+   * arrive sometimes.
+   */
+  readonly scriptedFailures?: readonly { readonly seq: number; readonly kind: RailFailureKind }[];
 }
 
 const ALL_FAILURES: readonly RailFailureKind[] = [
@@ -78,6 +88,7 @@ export class MockRail implements Rail {
   readonly #failureKinds: readonly RailFailureKind[];
   readonly #duplicateRate: number;
   readonly #outOfOrderRate: number;
+  readonly #scriptedFailures: ReadonlyMap<number, RailFailureKind>;
 
   readonly #handlers = new Set<WebhookHandler>();
   #queue: WebhookEvent[] = [];
@@ -90,6 +101,9 @@ export class MockRail implements Rail {
     this.#failureKinds = options.failureKinds ?? ALL_FAILURES;
     this.#duplicateRate = options.duplicateWebhookRate ?? 0;
     this.#outOfOrderRate = options.outOfOrderWebhookRate ?? 0;
+    this.#scriptedFailures = new Map(
+      (options.scriptedFailures ?? []).map((f) => [f.seq, f.kind]),
+    );
 
     if (this.#failureKinds.length === 0 && this.#failureRate > 0) {
       throw new Error('failureRate is set but failureKinds is empty.');
@@ -112,6 +126,13 @@ export class MockRail implements Rail {
     // Adding a rule that consumes randomness elsewhere therefore cannot shift
     // the failure pattern of an unrelated scenario.
     const rng = this.#rng.derive(`execute/${action.seq}`);
+
+    // Scripted failures win over the rate, and consume no randomness, so
+    // adding one to a scenario does not shift the failure pattern of any other.
+    const scripted = this.#scriptedFailures.get(action.seq);
+    if (scripted !== undefined) {
+      return { result: 'failed', railError: scripted, retryable: RETRYABLE[scripted] };
+    }
 
     if (rng.chance(this.#failureRate)) {
       const failure = rng.pick(this.#failureKinds);

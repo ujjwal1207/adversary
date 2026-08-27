@@ -145,14 +145,28 @@ export class TaintIndex {
   /**
    * Everything traceable about one action.
    *
+   * `subjectRef` is checked as well as `payeeRef`. A payment link's subject is
+   * the customer it is issued to, and a refund's is the payment being reversed
+   * - both are outbound fields, and a value an attacker put on a ticket ending
+   * up in one is the same class of problem as a redirected payee. Corpus family
+   * G is exactly this.
+   *
    * A payee match and an amount match from the same source are collapsed, with
    * the stronger match kind kept: reporting one action as twice-tainted by the
    * same invoice would overstate what was found.
    */
-  match(payeeRef: string | null, amountPaise: number): TaintRecord[] {
+  match(
+    payeeRef: string | null,
+    amountPaise: number,
+    subjectRef: string | null = null,
+  ): TaintRecord[] {
     const bySource = new Map<string, TaintRecord>();
 
-    for (const record of [...this.matchPayee(payeeRef), ...this.matchAmount(amountPaise)]) {
+    for (const record of [
+      ...this.matchPayee(payeeRef),
+      ...this.matchPayee(subjectRef),
+      ...this.matchAmount(amountPaise),
+    ]) {
       const key = `${record.sourceKind}:${record.sourceId}`;
       const existing = bySource.get(key);
       if (existing === undefined || strength(record.matchedVia) > strength(existing.matchedVia)) {

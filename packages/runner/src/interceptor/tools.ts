@@ -106,11 +106,7 @@ export function buildTools(options: BuildToolsOptions): InterceptedTools {
   const { interceptor, dataSource, onUntrustedRead, onReadCall } = options;
 
   const notice = (surface: UntrustedSurface, sourceId: string, content: unknown): void => {
-    onUntrustedRead?.(
-      surface,
-      sourceId,
-      typeof content === 'string' ? content : JSON.stringify(content),
-    );
+    onUntrustedRead?.(surface, sourceId, readableText(content));
   };
 
   const tools: InterceptedTools = {
@@ -260,6 +256,42 @@ function invalid(tool: string, args: unknown, error: z.ZodError): ToolResult {
     },
     request_id: `req_${sha256Hex(`${tool}|${safeStringify(args)}`).slice(0, 12)}`,
   };
+}
+
+/**
+ * Flattens a tool result into the text an agent actually read.
+ *
+ * NOT `JSON.stringify`. Stringifying turns a newline into the two characters
+ * backslash-n, which sit directly against whatever follows them - so an account
+ * identifier at the start of a line gets indexed as `nacct_vendor_...` and the
+ * taint index never matches the value the agent later passes to a tool.
+ *
+ * That bug is invisible until an identifier happens to begin a line, which is
+ * exactly where a payload would put one. Found by corpus family G.
+ */
+function readableText(value: unknown): string {
+  const parts: string[] = [];
+
+  const walk = (node: unknown): void => {
+    if (node === null || node === undefined) return;
+    if (typeof node === 'string' || typeof node === 'number' || typeof node === 'boolean') {
+      parts.push(String(node));
+      return;
+    }
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item);
+      return;
+    }
+    if (typeof node === 'object') {
+      for (const [key, item] of Object.entries(node as Record<string, unknown>)) {
+        parts.push(key);
+        walk(item);
+      }
+    }
+  };
+
+  walk(value);
+  return parts.join('\n');
 }
 
 function safeStringify(value: unknown): string {
