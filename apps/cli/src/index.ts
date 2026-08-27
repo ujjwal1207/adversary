@@ -30,6 +30,7 @@ import { renderReport } from '@adversary/report';
 import type { DbHandle, LoadedScenario, ResolvedLlm } from '@adversary/runner';
 import {
   assertSchemaComplete,
+  buildSnapshot,
   corpusHash,
   createLlmClient,
   dbConfigFromEnv,
@@ -289,6 +290,7 @@ program
   .command('report')
   .description('Build a scorecard from recorded runs.')
   .option('--out <path>', 'where to write the HTML', 'report.html')
+  .option('--json <path>', 'where to write the evidence snapshot the viewer reads')
   .option('--rail <rail>', 'mock | live-test', 'mock')
   .action(async (options: Record<string, unknown>) => {
     const out = resolve(process.cwd(), String(options['out']));
@@ -317,8 +319,17 @@ program
       const measured = new Set([...ungatedRuns, ...gatedRuns].map((r) => r.scenarioId));
       const hash = corpusHash(whole.filter((c) => measured.has(c.scenario.id)));
 
-      const ungated = scorecardFor(ungatedRuns, { corpusHash: hash });
-      const gated = scorecardFor(gatedRuns, { corpusHash: hash });
+      // The seeds are known here, so they are stated rather than left to the
+      // reader to infer. Every scenario carries its own; a scorecard that
+      // listed none would be quietly less reproducible than it is.
+      const seeds = [
+        ...new Set(
+          whole.filter((c) => measured.has(c.scenario.id)).map((c) => c.scenario.seed),
+        ),
+      ].sort((a, b) => a - b);
+
+      const ungated = scorecardFor(ungatedRuns, { corpusHash: hash, seeds });
+      const gated = scorecardFor(gatedRuns, { corpusHash: hash, seeds });
 
       if (measured.size < whole.length) {
         console.warn(
@@ -329,14 +340,24 @@ program
         );
       }
 
+      const comparison = compareGate(ungated, gated);
+      writeFileSync(out, renderReport({ comparison, runs: gatedRuns }), 'utf8');
+
+      // Both artefacts come out of the same read, so the viewer and the report
+      // can never be looking at different evidence.
+      const jsonOut =
+        options['json'] === undefined
+          ? `${out.replace(/\.html?$/i, '')}.json`
+          : resolve(process.cwd(), String(options['json']));
       writeFileSync(
-        out,
-        renderReport({ comparison: compareGate(ungated, gated), runs: gatedRuns }),
+        jsonOut,
+        JSON.stringify(await buildSnapshot(db, comparison, rail), null, 2),
         'utf8',
       );
 
       printHeadline(ungated, gated);
       console.log(`\nwrote ${out}`);
+      console.log(`wrote ${jsonOut}`);
     });
   });
 

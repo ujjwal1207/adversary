@@ -10,3 +10,4 @@ coverage/
 out/
 report.html
 .cassettes/
+apps/dashboard/public/snapshot.json

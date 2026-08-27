@@ -8,6 +8,9 @@ export { scriptFor } from './script.js';
 
 export { canonicalVerdicts, toRunRecord } from './record.js';
 
+export type { Snapshot, SnapshotRun, SnapshotScenario } from './snapshot.js';
+export { buildSnapshot } from './snapshot.js';
+
 export type { ReadRecordsFilter } from './read-records.js';
 export { readRunRecords } from './read-records.js';
 

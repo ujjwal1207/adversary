@@ -43,7 +43,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/coverage/**',
       '**/drizzle/**',
-      'apps/dashboard/**',
+      'apps/dashboard/dist/**',
     ],
   },
 
@@ -94,6 +94,21 @@ export default tseslint.config(
             {
               group: ['@adversary/rails/*', '**/rails/**', '**/packages/rails/**'],
               message: AGENTS_MAY_NOT_IMPORT_RAILS,
+            },
+            {
+              // An allowlist, not a list of known-bad names: everything under
+              // core is closed to agents except the contracts subpath. Written
+              // this way so that adding an export to core can never widen what
+              // an agent can reach - which is what happened when `./money` was
+              // added for the browser viewer and the old enumerated rule let
+              // it through.
+              // Gitignore semantics, so the bare package name must NOT appear
+              // here: a pattern that excludes a directory makes it impossible
+              // to re-include anything beneath it, and the negation below would
+              // silently do nothing. `@adversary/core` itself is blocked by
+              // name in `paths` above instead.
+              group: ['@adversary/core/*', '!@adversary/core/contracts'],
+              message: AGENTS_CONTRACTS_ONLY,
             },
           ],
         },

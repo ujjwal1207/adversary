@@ -4,13 +4,30 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@adversary/core": ["packages/core/src/index.ts"],
-      "@adversary/core/contracts": ["packages/core/src/contracts.ts"],
-      "@adversary/gate": ["packages/gate/src/index.ts"],
-      "@adversary/rails": ["packages/rails/src/index.ts"],
-      "@adversary/agents": ["packages/agents/src/index.ts"],
-      "@adversary/runner": ["packages/runner/src/index.ts"],
-      "@adversary/report": ["packages/report/src/index.ts"]
+      "@adversary/core": [
+        "packages/core/src/index.ts"
+      ],
+      "@adversary/core/contracts": [
+        "packages/core/src/contracts.ts"
+      ],
+      "@adversary/gate": [
+        "packages/gate/src/index.ts"
+      ],
+      "@adversary/rails": [
+        "packages/rails/src/index.ts"
+      ],
+      "@adversary/agents": [
+        "packages/agents/src/index.ts"
+      ],
+      "@adversary/runner": [
+        "packages/runner/src/index.ts"
+      ],
+      "@adversary/report": [
+        "packages/report/src/index.ts"
+      ],
+      "@adversary/core/money": [
+        "packages/core/src/money.ts"
+      ]
     }
   },
   "include": [
@@ -21,5 +38,8 @@
     "*.config.ts",
     "eslint.config.js"
   ],
-  "exclude": ["**/dist/**", "**/node_modules/**"]
+  "exclude": [
+    "**/dist/**",
+    "**/node_modules/**"
+  ]
 }

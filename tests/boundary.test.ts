@@ -88,13 +88,25 @@ describe('layer 1 - module resolution', () => {
     expect(Object.keys(deps)).toContain('@adversary/core');
   });
 
-  it('@adversary/core exports only the root and the contracts subpath', () => {
-    // The exports map is what makes "contracts only" enforceable rather than
-    // aspirational: there is no third subpath for an agent to reach for.
+  it('@adversary/core exports exactly the three declared subpaths', () => {
+    // An enumerated list, so adding a way into core is a deliberate edit to
+    // this test rather than a side effect of a package.json change.
+    //
+    //   .           the full domain layer, for the runner and the report
+    //   ./contracts types only, no runtime values - the one an agent may reach
+    //   ./money     the pure money module, so the browser viewer can format
+    //               rupees with the same function the report uses instead of a
+    //               second implementation. The root reaches node:crypto through
+    //               canonical.ts and will not bundle for a browser.
+    //
+    // "Contracts only" for agents no longer rests on this list being short:
+    // the lint rule below is an allowlist that closes every core subpath except
+    // contracts, whatever this map contains.
     const corePkg = readJson(join(REPO_ROOT, 'packages/core/package.json'));
     expect(Object.keys(corePkg['exports'] as object).sort()).toEqual([
       '.',
       './contracts',
+      './money',
     ]);
   });
 });
@@ -138,6 +150,22 @@ describe('layer 2 - lint', () => {
     // agent the ledger and the evaluator.
     const messages = await messagesFor(
       `import { MONEY_KINDS } from '@adversary/core';\nexport const x = MONEY_KINDS;\n`,
+      agentFile,
+    );
+    const restricted = messages.filter((m) => m.ruleId === 'no-restricted-imports');
+
+    expect(restricted).toHaveLength(1);
+    expect(restricted[0]?.message).toMatch(/contracts/);
+  });
+
+  it('flags @adversary/core/money from packages/agents', async () => {
+    // The subpath exists for the browser viewer. An agent reaching it would be
+    // reaching past the contracts boundary, and the rule is an allowlist
+    // precisely so a new export cannot quietly become a new door.
+    const messages = await messagesFor(
+      `import { paise } from '@adversary/core/money';
+export const x = paise(1);
+`,
       agentFile,
     );
     const restricted = messages.filter((m) => m.ruleId === 'no-restricted-imports');
