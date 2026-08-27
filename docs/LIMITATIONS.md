@@ -65,10 +65,15 @@ The `demo` job in `.github/workflows/ci.yml` is that check on a fresh runner wit
 no credentials set, and it asserts more than exit zero — that the report carries
 both numbers, and that the snapshot covers every scenario in both gate states.
 
-What has been verified here: `pnpm demo` from a deleted database and a deleted
-report reproduces the shipped numbers exactly. What has not: that it does so on a
-machine that has never seen this repository. **No CI run of that job has been
-observed from here either**, since these workflows have never been executed.
+**It found a real bug on its first run.** `adversary report` wrote the snapshot
+into `apps/dashboard/public/`, a directory whose only file is gitignored — so git
+did not track it, and a fresh checkout did not have it. Every machine that had
+ever produced a snapshot already had the directory, which made the failure
+invisible to exactly the people who would have gone looking. `report` now creates
+the directory for whatever path it is given.
+
+That is the entire argument for the job. Four other CI jobs passed on the same
+commit, including the full suite against Postgres.
 
 ### The dashboard has no test suite
 
@@ -241,3 +246,4 @@ catches.
 | A persisted verdict came back in a different order, and `undefined` came back as `null` | the round-trip test |
 | The viewer summed a rail result that does not exist, reporting ₹0.00 moved | reading it against the data |
 | A new `core` subpath widened what an agent could import | the boundary test |
+| `report` wrote into a directory git does not track, so a fresh checkout failed | the `demo` CI job, first run |

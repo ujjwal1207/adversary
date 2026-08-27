@@ -16,8 +16,8 @@
  * `scripted`, the default rail is `mock`, and the default database is SQLite.
  */
 
-import { readdirSync, statSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 import { Command } from 'commander';
 
@@ -341,7 +341,7 @@ program
       }
 
       const comparison = compareGate(ungated, gated);
-      writeFileSync(out, renderReport({ comparison, runs: gatedRuns }), 'utf8');
+      write(out, renderReport({ comparison, runs: gatedRuns }));
 
       // Both artefacts come out of the same read, so the viewer and the report
       // can never be looking at different evidence.
@@ -349,17 +349,31 @@ program
         options['json'] === undefined
           ? `${out.replace(/\.html?$/i, '')}.json`
           : resolve(process.cwd(), String(options['json']));
-      writeFileSync(
-        jsonOut,
-        JSON.stringify(await buildSnapshot(db, comparison, rail), null, 2),
-        'utf8',
-      );
+      write(jsonOut, JSON.stringify(await buildSnapshot(db, comparison, rail), null, 2));
 
       printHeadline(ungated, gated);
       console.log(`\nwrote ${out}`);
       console.log(`wrote ${jsonOut}`);
     });
   });
+
+/**
+ * Writes a file, creating its directory first.
+ *
+ * `--out` and `--json` may point anywhere, and the default json path is inside
+ * `apps/dashboard/public/` - a directory whose only file is gitignored, which
+ * means git does not track it and a fresh checkout does not have it.
+ *
+ * Found by the `demo` CI job on its first run, and only there: every machine
+ * that had ever produced a snapshot already had the directory, so the failure
+ * was invisible to exactly the people who would have looked for it. That is the
+ * whole argument for testing a clean checkout on a machine nobody has warmed
+ * up, rather than trusting that it works because it works here.
+ */
+function write(path: string, content: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, content, 'utf8');
+}
 
 function printHeadline(
   ungated: ReturnType<typeof scorecardFor>,
