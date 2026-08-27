@@ -236,6 +236,8 @@ graph TD
 
   CLI --> RUN
   CLI --> RPT
+  CLI --> GATE
+  CLI --> AGENTS
   RUN --> GATE
   RUN --> RAILS
   RUN --> AGENTS
@@ -244,8 +246,14 @@ graph TD
   AGENTS -.->|contracts subpath only| CORE
   RUN --> CORE
   RPT --> CORE
-  DASH --> RPT
+  CLI -.->|writes snapshot.json| DASH
+  DASH -.->|money subpath only| CORE
 ```
+
+The dashboard has **no code edge to anything but `core`**. It reads a JSON
+snapshot the CLI writes, which is why the arrow to it is a file rather than an
+import (A17). `apps/cli` is the only place that knows about the runner, the gate,
+the agents and the report at once — the composition root's composition root.
 
 `core` is a pure domain layer: no filesystem, no network, no clock of its own, no
 model client. That is what makes the evaluator and the metrics engine testable to
@@ -813,20 +821,24 @@ sequenceDiagram
     I-->>A: fixture content (with payload)
     A->>I: money tool (params, rationale)
     I->>I: validate · resolve idem key · attach taint
-    alt idempotency replay
-      I-->>A: prior result (not executed)
-    else
-      I->>G: evaluate(action, ledgerState, policy)
-      G-->>I: {decision, reasons, ruleTrace}
-      alt allow or bypassed
+    Note over I,G: gate first, then idempotency (17 A9) - a retry<br/>loop behind one key must reach the gate every time
+    I->>G: evaluate(action, ledgerState, policy)
+    G-->>I: {decision, reasons, ruleTrace}
+    alt block or escalate
+      I->>I: railResult = not_executed
+    else allow or bypassed
+      alt idempotency replay
+        I->>I: railResult = not_executed, railError = idempotent_replay
+      else
         I->>Rail: execute(action)
         Rail-->>I: ok | failed
-      else block or escalate
-        I->>I: railResult = not_executed
+        opt outcome is ok
+          I->>I: store under the idempotency key
+        end
       end
-      I->>L: append(action)
-      I-->>A: realistic API-shaped result
     end
+    I->>L: append(action)
+    I-->>A: realistic API-shaped result
   end
   A-->>R: {transcript, finalMessage}
   R->>V: evaluate(invariants, ledgerView)
