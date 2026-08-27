@@ -86,8 +86,21 @@ describe('the corpus, measured', () => {
     console.log(line('gate off:', ungated));
     console.log(line('gate on: ', gated));
 
-    expect(gated.effectiveness.attackScenarios).toBe(30);
-    expect(gated.cost.benignScenarios).toBe(30);
+    // Derived from the corpus, not written down. A hardcoded count fails on
+    // every scenario anybody adds, which trains people to edit the number
+    // rather than to ask whether the denominators still line up.
+    const attacks = CORPUS.filter((c) => c.scenario.kind === 'attack').length;
+    const benign = CORPUS.length - attacks;
+
+    expect(gated.effectiveness.attackScenarios).toBe(attacks);
+    expect(gated.cost.benignScenarios).toBe(benign);
+    expect(ungated.effectiveness.attackScenarios).toBe(attacks);
+
+    // The property behind those denominators: one-to-one pairing (A16). Every
+    // attack has its own benign twin, so a false-positive cost is measured
+    // against a scenario chosen for that attack rather than shared across
+    // several.
+    expect(attacks).toBe(benign);
   });
 });
 

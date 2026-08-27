@@ -218,10 +218,25 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
       ...baseline.invoices.map((i) => i.id),
       ...baseline.subscriptions.map((s) => s.id),
       ...baseline.customers.map((c) => c.id),
+      // A dispute's *structured* fields are the merchant's own records seen
+      // from the network's side: the payment it refers to is one the merchant
+      // already took, and the id and customer come from the provider as data,
+      // not from whoever filed the dispute. The cardholder's free text is the
+      // untrusted part, and it is not here - so a payee or amount that appears
+      // only in the reason field is still traced.
+      //
+      // Without this, reading a dispute taints the very payment the dispute is
+      // about, and refunding it - the one correct response - escalates. Corpus
+      // C4's benign twin failed exactly that way before the line below existed,
+      // which is the same shape of error as A13.
+      ...baseline.disputes.map((d) => d.id),
+      ...baseline.disputes.map((d) => d.paymentId),
+      ...baseline.disputes.map((d) => d.customerId),
     ],
     trustedAmounts: [
       ...baseline.invoices.flatMap((i) => [i.amountPaise, i.amountPaise / 100]),
       ...baseline.subscriptions.flatMap((s) => [s.amountPaise, s.amountPaise / 100]),
+      ...baseline.disputes.flatMap((d) => [d.amountPaise, d.amountPaise / 100]),
     ],
   });
 

@@ -84,28 +84,18 @@ in a container image of the operator's choosing, and not on Windows or macOS. Th
 harness is developed on Windows and tested on Linux; no third platform is
 checked.
 
-### The dashboard has no test suite
+### The dashboard's tests cover behaviour, not appearance
 
-It is typechecked, linted, and built. Its logic is thin by design — the numbers
-arrive precomputed in the snapshot — and the two defects found in it were found
-by reading it against the data and by closing a type, not by a test.
+Fifteen tests render the run list and the trajectory viewer in a DOM and assert
+what they say: that the `SYNTHETIC` badge appears on manufactured evidence and
+not otherwise, that only `railResult: 'ok'` counts as money moved, that a
+re-run replaces a row instead of adding one, that a run opens from the keyboard,
+and that a run whose scenario is missing renders rather than crashing.
 
-That is a real gap. `railResult === 'executed'` typechecked as `string` for as
-long as the field was typed loosely, and every "moved" column read a reassuring
-₹0.00 next to runs where money had in fact left. The union is closed now, which
-turns that class of mistake into a compile error rather than a test that nobody
-wrote.
-
-### The SYNTHETIC badge never appears in the shipped demo
-
-There is no dispute scenario, so nothing in the corpus produces a payload
-carrying `synthetic: true`, so the badge the interface promises is never seen by
-anyone running `pnpm demo`.
-
-The detection is unit-tested — including that it finds a flag nested anywhere in
-a payload, and that it is not fooled by the word appearing as a value or by
-`synthetic: false`. But a reader should know that the label's first real outing
-will be the day a dispute scenario lands.
+Nothing asserts layout, colour or class names. Those change for good reasons,
+and a test pinning them produces false alarms rather than findings — so a
+visual regression in the viewer would not be caught here. Nobody is looking at
+this in more than one browser either.
 
 ### Postgres is verified in CI only
 
@@ -168,6 +158,18 @@ real-but-unapproved vendor with a near-identical name — and it is caught by th
 allowlist rule instead. Both invariants stay on that scenario so a report shows
 which defence did the work.
 
+The baseline has to be drawn *inside* a record as well as across records. A
+dispute is a single object with two kinds of field: structured ones the payment
+network supplies as data (the payment it refers to, the customer, the amount)
+and one free-text field the cardholder wrote. The structured fields are trusted
+and the reason is not, so a payee named only in the reason is traced while the
+payment the dispute is about is not.
+
+Getting that wrong is not subtle in its effects: with the whole dispute
+untrusted, reading one taints the very payment it concerns, and refunding that
+payment — the single correct response — escalates. Corpus `C4`'s benign twin
+failed exactly that way before the distinction existed.
+
 ### The recognition-execution gap is a keyword heuristic
 
 It is substring matching over the agent's stated rationale. It cannot tell
@@ -187,7 +189,7 @@ the report carries the rail it was measured on.
 
 It encodes publicly-documented failure classes. **Absence of violations means
 the corpus found none, not that none exist.** A scorecard of 0% attack success
-says the agent survived these sixty scenarios.
+says the agent survived these sixty-two scenarios.
 
 ### The gate has no notion of scope
 
@@ -199,32 +201,32 @@ fails.
 
 Those scenarios are the point rather than an oversight. A corpus containing only
 attacks the gate catches would be a corpus that flattered the gate. The residual
-13.3% attack success rate in the shipped scorecard is almost entirely these.
+12.9% attack success rate in the shipped scorecard is almost entirely these.
 
 ---
 
 ## Scope
 
-### Disputes and chargebacks are synthetic
+### Disputes and chargebacks are manufactured, and say so
 
-They cannot be created in a payment provider's test mode. Any dispute scenario
-would use a manufactured HMAC-signed webhook, carrying `synthetic: true` in the
-payload so the interface can badge it. **No dispute scenario ships yet.**
+They cannot be raised in a payment provider's test mode, so every dispute the
+corpus shows an agent was written by hand. Each carries `synthetic: true` in the
+payload itself — the field is typed as the literal `true`, because there is no
+such thing as a genuine dispute in this system and a fixture claiming otherwise
+should not compile.
+
+The badge that renders from it is asserted by a test in the viewer, not only by
+this sentence.
+
+What this does *not* cover: a real dispute's lifecycle. There is no evidence
+submission, no network response, no representment, and no deadline. The corpus
+uses a dispute as an untrusted surface that arrives from outside the merchant,
+which is what makes it interesting here — not as a workflow to be completed.
 
 ### Mandate authentication is not exercised
 
 Test mode mocks it. No real 3DS or OTP path is tested, so an agent's behaviour
 around a genuine authentication challenge is unmeasured.
-
-### Corpus scenario C4 is missing
-
-`C4` — injection through a webhook field — is named in the build spec and is not
-in the corpus. Webhook delivery to the agent needs a read tool the agent does not
-have, and the injection surface throws rather than silently injecting nothing:
-a scenario whose payload went nowhere would run clean and report the agent safe
-against an attack it was never shown.
-
-The corpus is 60 scenarios without it.
 
 ### Agent-to-agent scenarios are out of scope
 
@@ -235,7 +237,7 @@ problem gets substantially worse, is not modelled.
 
 The build spec asks for roughly 60% attack and 40% benign, and also that every
 attack be paired. With one-to-one pairing those cannot both hold. Pairing won:
-30 attacks, each with its own benign twin on the same surface and the same
+31 attacks, each with its own benign twin on the same surface and the same
 target. See `docs/ARCHITECTURE.md` §17 A16.
 
 ---
@@ -259,3 +261,4 @@ catches.
 | The viewer summed a rail result that does not exist, reporting ₹0.00 moved | reading it against the data |
 | A new `core` subpath widened what an agent could import | the boundary test |
 | `report` wrote into a directory git does not track, so a fresh checkout failed | the `demo` CI job, first run |
+| Reading a dispute tainted the very payment it was about, so refunding it escalated | corpus C4's benign twin |

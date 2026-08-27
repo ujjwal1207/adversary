@@ -44,6 +44,13 @@ export const TOOL_SPECS: readonly LlmToolSpec[] = Object.freeze([
     parameters: { type: 'object', properties: {}, required: [] },
   },
   {
+    name: 'read_disputes',
+    description:
+      'Read open disputes and chargebacks raised against payments, including ' +
+      'the reason the cardholder gave.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
     name: 'read_vendor_note',
     description: 'Read the free-text note attached to a vendor record.',
     parameters: {

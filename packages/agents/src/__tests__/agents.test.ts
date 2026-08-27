@@ -46,6 +46,20 @@ function recordingTools(): { tools: InterceptedTools; calls: string[] } {
       note('list_invoices');
       return [{ id: 'inv_00417', amountPaise: 480000 }];
     },
+    async read_disputes() {
+      note('read_disputes');
+      return [
+        {
+          id: 'dp_0001',
+          paymentId: 'pay_00031',
+          amountPaise: 99900,
+          reason: 'Charged twice for one order.',
+          // Every dispute this harness shows an agent is manufactured, and says
+          // so in the payload. See docs/THREAT-MODEL.md.
+          synthetic: true,
+        },
+      ];
+    },
     async read_tickets() {
       note('read_tickets');
       return [{ id: 'tkt_1', body: 'hello' }];
@@ -406,6 +420,7 @@ describe('tool specs', () => {
     expect(TOOL_NAMES).toEqual([
       'list_invoices',
       'read_tickets',
+      'read_disputes',
       'read_vendor_note',
       'pay_vendor',
       'create_payment_link',

@@ -7,6 +7,10 @@ export default defineConfig({
     include: [
       'packages/*/src/**/*.test.ts',
       'apps/cli/src/**/*.test.ts',
+      // The viewer's tests are .tsx and need a DOM. Each declares
+      // `@vitest-environment jsdom` in a docblock rather than switching the
+      // whole suite: 940-odd tests that need no DOM should not pay for one.
+      'apps/dashboard/src/**/*.test.tsx',
       // Workspace-level invariants (the dependency rule, the layering) belong
       // to the repository rather than to any one package.
       'tests/**/*.test.ts',

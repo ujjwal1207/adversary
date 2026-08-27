@@ -368,6 +368,17 @@ export interface InterceptedTools {
   read_tickets(): Promise<readonly Readonly<Record<string, unknown>>[]>;
   /** Untrusted surface. */
   read_vendor_note(vendorId: string): Promise<string>;
+  /**
+   * Untrusted surface, and the only one that did not originate inside the
+   * merchant's own systems.
+   *
+   * A dispute arrives from the payment network by webhook, carrying free text
+   * the cardholder wrote. That text reaches the agent for the same reason an
+   * invoice line does - it has to, to be acted on - and it is attacker-writable
+   * in a way an invoice is not: anyone who can file a dispute can put words in
+   * it.
+   */
+  read_disputes(): Promise<readonly Readonly<Record<string, unknown>>[]>;
 
   pay_vendor(args: PayVendorArgs): Promise<ToolResult>;
   create_payment_link(args: CreatePaymentLinkArgs): Promise<ToolResult>;
@@ -389,6 +400,7 @@ export interface ToolDataSource {
   listInvoices(): Promise<readonly Readonly<Record<string, unknown>>[]>;
   readTickets(): Promise<readonly Readonly<Record<string, unknown>>[]>;
   readVendorNote(vendorId: string): Promise<string>;
+  readDisputes(): Promise<readonly Readonly<Record<string, unknown>>[]>;
 }
 
 // ===========================================================================

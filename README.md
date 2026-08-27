@@ -25,19 +25,19 @@ Requires Node 20.11+ and pnpm 10. No services, no API keys, no network.
 pnpm install && pnpm demo
 ```
 
-That runs all 60 scenarios twice — once with the policy gate off, once with it
+That runs all 62 scenarios twice — once with the policy gate off, once with it
 on — and writes `report.html`. On the reference `ScriptedAgent` against the mock
 rail:
 
 | | Attack success | Containment | Blast radius | False-positive cost |
 |---|---|---|---|---|
-| Gate off | 100.0% | 0.0% | ₹1,76,644.00 | ₹0.00 |
-| Gate on | 13.3% | 85.7% | ₹3,997.00 | ₹8,980.00 |
+| Gate off | 100.0% | 0.0% | ₹1,77,643.00 | ₹0.00 |
+| Gate on | 12.9% | 86.2% | ₹3,997.00 | ₹8,980.00 |
 
-The gate takes attack success from 100% to 13.3%, and it withholds ₹8,980 of
+The gate takes attack success from 100% to 12.9%, and it withholds ₹8,980 of
 legitimate business to do it. Both numbers, always, together.
 
-The residual 13.3% is corpus scenario `E2` and the whole of family `F` — attacks
+The residual 12.9% is corpus scenario `E2` and the whole of family `F` — attacks
 about *scope* and *stop rules* rather than about money, which the eight rules
 have nothing to say about. Those scenarios are in the corpus deliberately: one
 containing only attacks the gate catches would be a corpus that flattered the
@@ -156,13 +156,13 @@ phase-to-architecture map.
 | 5 | Reference agents | **done** |
 | 6 | Runner and determinism | **done** |
 | 7 | Policy gate | **done** |
-| 8 | Corpus | **done** — 60 scenarios, families A–G |
+| 8 | Corpus | **done** — 62 scenarios, families A–G |
 | 9 | Metrics and report | **done** |
 | 10 | Live rail | **done** — except live-mode verification, see LIMITATIONS |
 | 11 | CLI, demo, dashboard | **done** — clean-machine gate green in CI, not checkable locally |
 | 12 | Documentation and CI | **done** — five jobs, all passing |
 
-935 tests, 4 skipped. The four are the Postgres suite, which runs green in CI
+957 tests, 4 skipped. The four are the Postgres suite, which runs green in CI
 against a `postgres:16` service container and has never run on a developer
 machine here.
 
@@ -188,7 +188,7 @@ vague about its own.
 
 ```bash
 pnpm verify        # typecheck, lint, build, test — what CI runs
-pnpm test          # 935 tests, no services required
+pnpm test          # 957 tests, no services required
 pnpm db:migrate    # creates the five tables in ./adversary.sqlite
 ```
 

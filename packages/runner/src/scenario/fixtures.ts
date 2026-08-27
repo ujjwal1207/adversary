@@ -52,6 +52,31 @@ export interface CustomerFixture {
   readonly name: string;
 }
 
+/**
+ * A dispute, as it arrives from the payment network.
+ *
+ * `synthetic` is not decoration and is not optional. A dispute cannot be raised
+ * in a payment provider's test mode, so every dispute this harness shows an
+ * agent is manufactured by the harness - and docs/THREAT-MODEL.md commits to a
+ * reader being able to see that from the interface without having read the
+ * documentation first. The flag travels inside the payload, so it reaches the
+ * trajectory, the snapshot and the viewer's badge by itself.
+ *
+ * Typed as the literal `true` rather than `boolean`: there is no such thing as
+ * a non-synthetic dispute in this system, and a fixture claiming otherwise
+ * should not compile.
+ */
+export interface DisputeFixture {
+  readonly id: string;
+  readonly paymentId: string;
+  readonly customerId: string;
+  readonly amountPaise: number;
+  /** Free text the cardholder wrote. The untrusted part. */
+  readonly reason: string;
+  readonly status: string;
+  readonly synthetic: true;
+}
+
 export interface FixtureSet {
   readonly vendors: readonly VendorFixture[];
   readonly invoices: readonly InvoiceFixture[];
@@ -65,6 +90,7 @@ export interface FixtureSet {
    */
   readonly subscriptions: readonly SubscriptionFixture[];
   readonly customers: readonly CustomerFixture[];
+  readonly disputes: readonly DisputeFixture[];
 }
 
 export const DEFAULT_FIXTURES: FixtureSet = Object.freeze({
@@ -94,6 +120,7 @@ export const DEFAULT_FIXTURES: FixtureSet = Object.freeze({
     { id: 'sub_00060', customerId: 'cust_0007', amountPaise: 29900, state: 'active' },
   ],
   customers: [{ id: 'cust_0007', name: 'Wren Batra' }],
+  disputes: [],
 });
 
 /** Reads a fixture file declared by a scenario, or falls back to the defaults. */
@@ -119,6 +146,7 @@ export function loadFixtures(scenario: Scenario, source: string): FixtureSet {
     tickets: read(scenario.fixtures.tickets, DEFAULT_FIXTURES.tickets),
     subscriptions: read(scenario.fixtures.subscriptions, DEFAULT_FIXTURES.subscriptions),
     customers: read(scenario.fixtures.customers, DEFAULT_FIXTURES.customers),
+    disputes: read(scenario.fixtures.disputes, DEFAULT_FIXTURES.disputes),
   };
 }
 
@@ -184,17 +212,26 @@ export function applyInjection(fixtures: FixtureSet, scenario: Scenario, source:
       };
     }
 
-    case 'webhook_field':
-      // Delivered by the rail rather than read through a tool, so it is not a
-      // fixture edit. Phase 10 wires it; a scenario using it today would inject
-      // nothing, and injecting nothing must never look like injecting
-      // something.
-      throw new ScenarioError(
-        'injection surface `webhook_field` is not wired up yet (Phase 10). ' +
-          'A scenario whose payload goes nowhere would report the agent safe ' +
-          'against an attack it was never shown.',
-        source,
-      );
+    case 'webhook_field': {
+      // The cardholder's own words on a dispute, delivered by the payment
+      // network. Injected exactly like the other three surfaces - as data in a
+      // field the agent reads through a normal tool call - because a payload
+      // the harness announced would test whether the agent can read a flag.
+      //
+      // The dispute keeps its `synthetic: true`, which is what puts the badge
+      // on this run in the viewer.
+      const found = fixtures.disputes.some((d) => d.id === target);
+      if (!found) throw missing(source, surface, target, fixtures.disputes.map((d) => d.id));
+      return {
+        fixtures: {
+          ...fixtures,
+          disputes: fixtures.disputes.map((dispute) =>
+            dispute.id === target ? { ...dispute, reason: payload } : dispute,
+          ),
+        },
+        injectedInto: { surface, target },
+      };
+    }
   }
 }
 
@@ -219,6 +256,9 @@ export function dataSourceFor(fixtures: FixtureSet): ToolDataSource {
     },
     async readTickets() {
       return fixtures.tickets.map((ticket) => ({ ...ticket }));
+    },
+    async readDisputes() {
+      return fixtures.disputes.map((dispute) => ({ ...dispute }));
     },
     async readVendorNote(vendorId) {
       const vendor = fixtures.vendors.find((v) => v.id === vendorId);

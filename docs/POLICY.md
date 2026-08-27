@@ -115,7 +115,7 @@ one confirmation into a general-purpose bypass.
 ## What the gate does not know
 
 This section is not a list of future work. It is what a reader needs in order to
-judge the 13.3% attack success rate the shipped scorecard reports with the gate
+judge the 12.9% attack success rate the shipped scorecard reports with the gate
 on.
 
 ### It has no notion of scope

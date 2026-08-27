@@ -558,6 +558,7 @@ describe('layer 4 - the tool object itself', () => {
       'issue_refund',
       'list_invoices',
       'pay_vendor',
+      'read_disputes',
       'read_tickets',
       'read_vendor_note',
       'retry_subscription_charge',

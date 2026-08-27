@@ -99,6 +99,9 @@ the ones that make parts of this document less verified than they sound.
 
 ## Synthetic data must be visible in the interface
 
+Corpus scenario `C4` and its benign twin ship exactly this, and the badge is
+asserted by a test that renders the viewer rather than only by this paragraph.
+
 Any scenario that uses a manufactured webhook — disputes and chargebacks cannot
 be created in a provider's test mode — carries `synthetic: true` in the event
 payload itself, and the dashboard renders its SYNTHETIC badge from that field.

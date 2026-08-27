@@ -130,6 +130,15 @@ export function buildTools(options: BuildToolsOptions): InterceptedTools {
       return tickets;
     },
 
+    async read_disputes() {
+      onReadCall?.('read_disputes', {});
+      const disputes = await dataSource.readDisputes();
+      for (const dispute of disputes) {
+        notice('webhook_field', String(dispute['id'] ?? 'unknown'), dispute);
+      }
+      return disputes;
+    },
+
     async read_vendor_note(vendorId: string) {
       onReadCall?.('read_vendor_note', { vendorId });
       const note = await dataSource.readVendorNote(vendorId);

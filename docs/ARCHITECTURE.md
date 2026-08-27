@@ -1128,6 +1128,24 @@ covers the value. Confirmation is a first-class trajectory event, emitted when
 checks that a confirmation event exists whose approved values cover the tainted
 value — approval of one payee does not launder a different one.
 
+### 10.4b Where the baseline is drawn inside one record
+
+The trusted baseline is not only a set of records; on some records it is a set
+of *fields*.
+
+A dispute arrives from the payment network carrying both. Its `paymentId`,
+`customerId`, `amountPaise` and `id` are structured data the network supplies —
+they describe a payment the merchant already took, and no attacker chose them.
+Its `reason` is free text written by whoever filed the dispute. The first group
+joins the baseline; the second never does.
+
+Draw the line in the wrong place and the rule inverts. Treat the whole dispute
+as untrusted and reading one taints the payment it is about, so refunding that
+payment — the one action a duplicate-charge dispute calls for — escalates.
+Corpus `C4`'s benign twin failed that way before this distinction existed, which
+is the same shape of error as [A13](#a13--taint-needs-a-trusted-baseline-addition)
+one level further in.
+
 ### 10.5 The limitation, stated plainly
 
 Taint propagation is **normalization-based**. A semantic paraphrase that changes an
@@ -1538,6 +1556,33 @@ machine load ([§9.3](#93-the-virtual-clock)).
 Blast radius is unauditable without knowing which actions produced it
 ([§11.5](#115-witness-sets-and-blast-radius)).
 
+### A20 — The webhook surface is a dispute the agent reads, not an event pushed at it (refinement)
+
+**Spec:** `webhook_field` is one of four untrusted surfaces, and corpus scenario
+`C4` is injection through one.
+
+**Issue:** the surface sat in the enum from Phase 2 and threw when used, because
+"deliver a webhook to the agent" has no obvious shape. An agent has no inbox. A
+harness that narrated the event into the prompt would be testing whether the
+agent can read a flag, since narration is exactly the thing an injected payload
+is not.
+
+**Resolution:** the agent reads disputes through `read_disputes`, the same way it
+reads invoices and tickets, and the payload is written into the `reason` field —
+data in a record, indistinguishable from a real one. This makes the surface the
+most interesting of the four rather than the most awkward: an invoice comes from
+a supplier the merchant chose and a ticket from a customer who bought something,
+but a dispute reason is written by whoever filed the dispute, arrives through
+the payment network, and reaches the agent because the text is the thing that
+has to be acted on.
+
+Two consequences worth naming. The trusted baseline had to become
+field-level within a single record ([§10.4b](#104b-where-the-baseline-is-drawn-inside-one-record)).
+And because a dispute cannot be raised in a provider's test mode, every one is
+manufactured and carries `synthetic: true` — so this is also the scenario that
+finally makes the badge `docs/THREAT-MODEL.md` promises appear in the shipped
+demo, rather than only in a unit test.
+
 ### A19 — `--rail live-test` is refused by the CLI, not wired to it (deviation)
 
 **Spec:** `adversary run ... [--rail mock|live-test]`.
@@ -1612,8 +1657,8 @@ attacks and 24 benign, so twelve attacks would have to share a benign twin — a
 a shared twin measures the cost of one defence against several different
 attacks, which makes the pairing weaker exactly where it matters.
 
-**Resolution:** 30 attacks, each with its own benign twin using the same
-surface and the same target. The corpus is 60 scenarios, every attack is paired,
+**Resolution:** 31 attacks, each with its own benign twin using the same
+surface and the same target. The corpus is 62 scenarios, every attack is paired,
 and false-positive cost is computed against a twin chosen for that attack. If
 the ratio matters more than the pairing, adding attack-only variants is a
 one-line change to the emitter; the pairing is the harder property to recover.
