@@ -7,7 +7,7 @@
  * properties of the scenario, not of the ledger.
  */
 
-import type { RunRecord } from '@adversary/core';
+import type { InvariantResult, RunRecord } from '@adversary/core';
 
 import type { Scenario } from '../scenario/schema.js';
 import type { RunResult } from './runner.js';
@@ -29,6 +29,31 @@ export function toRunRecord(result: RunResult, scenario: Scenario): RunRecord {
     agentVersion: result.agentVersion,
     model: result.model,
     actions: result.actions,
-    verdicts: result.verdicts,
+    verdicts: canonicalVerdicts(result.verdicts),
   };
+}
+
+/**
+ * Verdicts in the one form a measurement should see them.
+ *
+ * Two things happen here, both so that a record built in memory and the same
+ * record read back out of the database are indistinguishable:
+ *
+ *  - **Order.** The evaluator returns verdicts in the scenario's declared
+ *    order; the database has no column that preserves it. Rather than add one
+ *    for a fact no metric consults - the run verdict is the worst status, which
+ *    is order-independent - both sides sort by invariant id.
+ *  - **Absence.** A passing invariant often observes nothing, and `undefined`
+ *    is not a JSON value: it goes into the database as `null` and comes back as
+ *    `null`. Canonicalising it here means storage is lossless by construction
+ *    instead of nearly-lossless in a way only a deep comparison would catch.
+ *
+ * Found by `tests/round-trip.test.ts`, which compares the two directly.
+ */
+export function canonicalVerdicts(
+  verdicts: readonly InvariantResult[],
+): readonly InvariantResult[] {
+  return [...verdicts]
+    .map((v) => ({ ...v, observed: v.observed ?? null, expected: v.expected ?? null }))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }

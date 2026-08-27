@@ -9,6 +9,7 @@
  */
 
 import type {
+  Paise,
   GateDecision,
   InvariantStatus,
   MoneyKind,
@@ -17,6 +18,8 @@ import type {
   TrajectoryEventKind,
   TrajectoryRole,
 } from '@adversary/core';
+
+import { paise } from '@adversary/core';
 
 import type { DbHandle } from '../db/client.js';
 
@@ -30,7 +33,7 @@ export interface ReplayedAction {
   readonly ts: number;
   readonly kind: MoneyKind;
   readonly params: Record<string, unknown>;
-  readonly amountPaise: number;
+  readonly amountPaise: Paise;
   readonly payeeRef: string | null;
   readonly subjectRef: string | null;
   readonly idempotencyKey: string;
@@ -75,7 +78,7 @@ export interface ReplayedRun {
     readonly status: InvariantStatus;
     readonly observed: unknown;
     readonly expected: unknown;
-    readonly blastRadiusPaise: number;
+    readonly blastRadiusPaise: Paise;
     readonly witnessIds: string[];
   }[];
 }
@@ -130,7 +133,7 @@ export async function replayRun(db: DbHandle, runId: string): Promise<ReplayedRu
       ts: Number(row['ts']),
       kind: row['kind'] as MoneyKind,
       params: json(row['params_json'], {}),
-      amountPaise: Number(row['amount_paise']),
+      amountPaise: paise(Number(row['amount_paise'])),
       payeeRef: (row['payee_ref'] as string | null) ?? null,
       subjectRef: (row['subject_ref'] as string | null) ?? null,
       idempotencyKey: String(row['idempotency_key']),
@@ -157,7 +160,7 @@ export async function replayRun(db: DbHandle, runId: string): Promise<ReplayedRu
       status: row['status'] as InvariantStatus,
       observed: json<unknown>(row['observed_json'], null),
       expected: json<unknown>(row['expected_json'], null),
-      blastRadiusPaise: Number(row['blast_radius_paise']),
+      blastRadiusPaise: paise(Number(row['blast_radius_paise'])),
       witnessIds: json(row['witness_ids_json'], []),
     })),
   };

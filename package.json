@@ -21,7 +21,9 @@
     "db:generate:pg": "drizzle-kit generate --config=drizzle.pg.config.ts",
     "db:migrate": "tsx packages/runner/src/db/migrate-cli.ts",
     "verify": "pnpm typecheck && pnpm lint && pnpm build && pnpm test",
-    "scorecard": "tsx scripts/scorecard.ts"
+    "scorecard": "tsx scripts/scorecard.ts",
+    "adversary": "tsx apps/cli/src/index.ts",
+    "demo": "pnpm build && tsx apps/cli/src/index.ts run --all --gate both --fresh && tsx apps/cli/src/index.ts report --out report.html"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

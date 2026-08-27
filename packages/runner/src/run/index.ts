@@ -6,7 +6,10 @@ export { runScenario } from './runner.js';
 
 export { scriptFor } from './script.js';
 
-export { toRunRecord } from './record.js';
+export { canonicalVerdicts, toRunRecord } from './record.js';
+
+export type { ReadRecordsFilter } from './read-records.js';
+export { readRunRecords } from './read-records.js';
 
 export type { DeterminismOptions, DeterminismReport } from './determinism.js';
 export { verifyDeterminism, verifyDeterminismAcross } from './determinism.js';
