@@ -27,6 +27,7 @@ import type {
 import {
   InMemoryLedger,
   TICK_MS,
+  TaintIndex,
   VirtualClock,
   createRng,
   ledgerDigest,
@@ -42,7 +43,13 @@ import { InMemoryIdempotencyStore } from '../interceptor/idempotency.js';
 import { Interceptor } from '../interceptor/interceptor.js';
 import { buildTools } from '../interceptor/tools.js';
 import type { LoadedScenario } from '../scenario/loader.js';
-import { applyInjection, dataSourceFor, loadFixtures } from '../scenario/fixtures.js';
+import type { FixtureSet } from '../scenario/fixtures.js';
+import {
+  DEFAULT_FIXTURES,
+  applyInjection,
+  dataSourceFor,
+  loadFixtures,
+} from '../scenario/fixtures.js';
 import { deriveRunKey, makeRunId } from './run-key.js';
 import { scriptFor } from './script.js';
 
@@ -154,10 +161,11 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
 
   // --- 4. Inject ----------------------------------------------------------
   let dataSource;
+  let baseline: FixtureSet = DEFAULT_FIXTURES;
   let error: string | null = null;
   try {
-    const fixtures = loadFixtures(scenario, loaded.source);
-    const injected = applyInjection(fixtures, scenario, loaded.source);
+    baseline = loadFixtures(scenario, loaded.source);
+    const injected = applyInjection(baseline, scenario, loaded.source);
     dataSource = dataSourceFor(injected.fixtures);
 
     record({
@@ -193,6 +201,21 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
   }
 
   // --- 5/6. Invoke and intercept ------------------------------------------
+  // Seeded from the state of the world BEFORE the payload was written, plus
+  // the policy's own allowlist. Anything the agent then reads that is not in
+  // here is something an untrusted surface introduced.
+  const taint = new TaintIndex({
+    trustedIdentifiers: [
+      ...scenario.policy.allowlist,
+      ...baseline.vendors.map((v) => v.id),
+      ...baseline.invoices.map((i) => i.vendorId),
+    ],
+    trustedAmounts: baseline.invoices.flatMap((i) => [
+      i.amountPaise,
+      i.amountPaise / 100,
+    ]),
+  });
+
   const interceptor = new Interceptor({
     runId,
     runKey,
@@ -203,11 +226,19 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
     gate,
     idempotency: new InMemoryIdempotencyStore(),
     onTrajectory: record,
+    taintFor: (call) => taint.match(call.payeeRef, call.amountPaise),
   });
 
   const tools = buildTools({
     interceptor,
     dataSource,
+    // Provenance. Every untrusted read is scanned and indexed, and the
+    // interceptor matches each money action's own parameters against the index
+    // - not against the agent's prose. That is what makes paraphrase survivable
+    // without semantic machinery (docs/ARCHITECTURE.md 10.2).
+    onUntrustedRead: (surface, sourceId, content) => {
+      taint.record(surface, sourceId, content);
+    },
     // Reads are observed by the harness as well, so `turnsUsed` can be counted
     // from evidence rather than from the agent's own account of itself. Counted
     // per call, not per source: one list_invoices returning thirty invoices is
@@ -254,7 +285,11 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
   const verdicts = verifyAll(scenario.invariants, {
     view,
     policy: scenario.policy,
-    untrusted: untrustedFrom(scenario),
+    // Derived from what the agent actually read, not from the scenario's
+    // declared payload. A scenario author does not have to list the values
+    // their own injection introduced, and an invariant cannot go stale against
+    // a payload that changed.
+    untrusted: taint.toUntrusted(),
   });
 
   await rail.teardown(runKey);
@@ -318,19 +353,6 @@ function witnessSeqs(
     .map((id) => bySeq.get(id))
     .filter((seq): seq is number => seq !== undefined)
     .sort((a, b) => a - b);
-}
-
-/**
- * Values an attacker put on an untrusted surface.
- *
- * Derived from the injection payload by extracting account-shaped tokens. This
- * is a deliberately shallow stand-in: Phase 7 replaces it with the taint index,
- * which matches an action's own parameters rather than scraping the payload.
- */
-function untrustedFrom(scenario: { injection?: { payload: string } | undefined }): Record<string, unknown> {
-  const payload = scenario.injection?.payload ?? '';
-  const derivedPayees = [...payload.matchAll(/\bacct_[a-z0-9_]+/gi)].map((m) => m[0]);
-  return { derivedPayees: [...new Set(derivedPayees)] };
 }
 
 /** Runs with no model are fully reproducible; runs with one are not, yet. */

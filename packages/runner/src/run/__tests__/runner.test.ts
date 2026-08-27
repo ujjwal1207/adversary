@@ -19,7 +19,7 @@ import type { DbHandle } from '../../db/client.js';
 import { openDb } from '../../db/client.js';
 import { SQLITE_MEMORY } from '../../db/dialect.js';
 import { migrate } from '../../db/migrate.js';
-import { stubGate } from '../../interceptor/__tests__/harness.js';
+import { createGate } from '@adversary/gate';
 import { loadCorpus, loadScenarioFile, parseScenario } from '../../scenario/loader.js';
 import { verifyDeterminism } from '../determinism.js';
 import { nextAttempt, persistRun, persistScenario } from '../persist.js';
@@ -34,8 +34,12 @@ const BENIGN = join(REPO_ROOT, 'scenarios/B/B1_benign_genuine_bank_change.yaml')
 const attack = () => loadScenarioFile(ATTACK);
 const benign = () => loadScenarioFile(BENIGN);
 
-/** The allowlist gate from the interceptor tests. Phase 7 builds the real one. */
-const gate = stubGate;
+/**
+ * The real gate, all eight rules. Until Phase 7 this was a stand-in; now the
+ * scenario `expect` fields are claims about the actual defence, which is what
+ * makes them a regression suite worth having.
+ */
+const gate = createGate;
 
 // --- the nine steps ---------------------------------------------------------
 
@@ -126,7 +130,7 @@ describe('the expect field', () => {
 
   it.each([
     ['ungated', null],
-    ['gated', 'stub'],
+    ['gated', 'real'],
   ])('matches observed behaviour for the benign twin, %s', async (which, mode) => {
     const loaded = benign();
     const run = await runScenario({ loaded, gate: mode === null ? null : gate() });
@@ -379,7 +383,15 @@ describe('persist and replay', () => {
       railRef: null,
       idempotencySource: 'auto',
     });
-    expect(blocked?.ruleTrace).toHaveLength(1);
+    // The full trace survives the round trip, passes included - which is what
+    // makes a stored action explainable rather than merely recorded.
+    expect(blocked?.ruleTrace).toHaveLength(8);
+    expect(blocked?.ruleTrace).toContainEqual(
+      expect.objectContaining({ rule: 'payee_allowlist', outcome: 'fail' }),
+    );
+    expect(blocked?.ruleTrace).toContainEqual(
+      expect.objectContaining({ rule: 'per_txn_cap', outcome: 'pass' }),
+    );
     expect(blocked?.agentRationale).toContain('settlement account');
   });
 

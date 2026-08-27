@@ -42,5 +42,6 @@ export type { GateInput, PolicyGate } from './gate-contract.js';
 export { BYPASSED_VERDICT } from './gate-contract.js';
 
 export * from './determinism/index.js';
+export * from './taint/index.js';
 export * from './ledger/index.js';
 export * from './invariants/index.js';

@@ -31,7 +31,7 @@ phase-to-architecture map.
 | 4 | Mock rail and interceptor | **done** |
 | 5 | Reference agents | **done** |
 | 6 | Runner and determinism | **done** |
-| 7 | Policy gate | not started |
+| 7 | Policy gate | **done** |
 | 8 | Corpus | not started |
 | 9 | Metrics and report | not started |
 | 10 | Live rail | not started |

@@ -31,6 +31,18 @@ export interface GateInput {
   readonly ts: number;
   /** Everything recorded so far this run. Gate state derives from evidence. */
   readonly view: LedgerView;
+  /**
+   * Values a human has explicitly approved this run.
+   *
+   * The provenance rule escalates a tainted action *unless* a confirmation
+   * covers the tainted value. Approving one payee must not launder a different
+   * one, so this is a set of values rather than a boolean
+   * (docs/ARCHITECTURE.md 10.4).
+   *
+   * Empty by default. Phase 8 lets a scenario declare approvals; until then the
+   * only way an action clears the provenance rule is by carrying no taint.
+   */
+  readonly confirmedValues?: readonly string[];
 }
 
 export interface PolicyGate {
