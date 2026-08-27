@@ -53,7 +53,11 @@ beneath it — not a model's judgment. Every number in the shipped scorecard com
 from `ScriptedAgent`, so it measures **the harness and the gate**, not any
 model's behaviour.
 
-### The clean-container gate runs in CI, and CI has not been observed running
+### The clean-container gate is met in CI, not on a developer machine
+
+**Status: passing.** Run `33110069174` on commit `74700f0` — all five jobs green,
+`pnpm install && pnpm demo` in 31 seconds on a fresh runner with no credentials
+set.
 
 Phase 11's acceptance condition is that a clean container with only an API key
 set produces a scorecard from `pnpm install && pnpm demo`. There is no container
@@ -72,8 +76,13 @@ ever produced a snapshot already had the directory, which made the failure
 invisible to exactly the people who would have gone looking. `report` now creates
 the directory for whatever path it is given.
 
-That is the entire argument for the job. Four other CI jobs passed on the same
-commit, including the full suite against Postgres.
+That is the entire argument for the job: it failed on the first commit it ever
+saw, on a defect four other green jobs could not see.
+
+What remains true: this has been verified on a GitHub-hosted Ubuntu runner, not
+in a container image of the operator's choosing, and not on Windows or macOS. The
+harness is developed on Windows and tested on Linux; no third platform is
+checked.
 
 ### The dashboard has no test suite
 
@@ -100,10 +109,13 @@ will be the day a dispute scenario lands.
 
 ### Postgres is verified in CI only
 
-`pnpm db:migrate` and the full suite run against a `postgres:16` service
-container on every push. They have never been run against Postgres on a
-developer machine, because none was available here. SQLite is verified both
-ways.
+**Status: passing.** The full suite runs green against a `postgres:16` service
+container, including the four tests that skip without a database.
+
+They have never been run against Postgres on a developer machine, because none
+was available here, so the dialect is exercised on exactly one configuration:
+the version, extensions and locale of that container image. SQLite is verified
+both ways.
 
 ---
 

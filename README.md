@@ -159,11 +159,19 @@ phase-to-architecture map.
 | 8 | Corpus | **done** — 60 scenarios, families A–G |
 | 9 | Metrics and report | **done** |
 | 10 | Live rail | **done** — except live-mode verification, see LIMITATIONS |
-| 11 | CLI, demo, dashboard | **done** — the clean-container half of the gate runs in CI, not here |
-| 12 | Documentation and CI | **done** |
+| 11 | CLI, demo, dashboard | **done** — clean-machine gate green in CI, not checkable locally |
+| 12 | Documentation and CI | **done** — five jobs, all passing |
 
-935 tests, 4 skipped. The four are the Postgres suite, which runs in CI against
-a `postgres:16` service container and has never run on a developer machine here.
+935 tests, 4 skipped. The four are the Postgres suite, which runs green in CI
+against a `postgres:16` service container and has never run on a developer
+machine here.
+
+CI runs five jobs on every push: the suite on SQLite, the same suite on Postgres,
+the dependency rule, the determinism gate, and `pnpm install && pnpm demo` on a
+fresh runner with no credentials. That last one is Phase 11's acceptance
+condition, which cannot be checked on a developer machine — and it earned its
+place by failing on the first commit it saw, on a defect the other four could
+not see. See [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md).
 
 ## Documentation
 
