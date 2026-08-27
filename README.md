@@ -34,7 +34,7 @@ phase-to-architecture map.
 | 7 | Policy gate | **done** |
 | 8 | Corpus | **done** - 60 scenarios, families A-G |
 | 9 | Metrics and report | **done** |
-| 10 | Live rail | not started |
+| 10 | Live rail | **done** - except live-mode verification, see LIMITATIONS |
 | 11 | CLI, demo, dashboard | not started |
 | 12 | Documentation and CI | not started |
 
@@ -72,9 +72,9 @@ ADVERSARY_DB_DIALECT=postgres ADVERSARY_PG_URL=postgres://... pnpm db:migrate
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - the design contract this build follows
-- `docs/THREAT-MODEL.md` - Phase 12
+- [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) - the safety boundary, and where each constraint is enforced
 - `docs/POLICY.md` - Phase 12
-- `docs/LIMITATIONS.md` - Phase 12
+- [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) - every known gap, including what this build has not verified
 
 ## Safety boundary
 

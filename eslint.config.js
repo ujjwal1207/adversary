@@ -108,7 +108,7 @@ export default tseslint.config(
   {
     files: [
       'packages/core/src/determinism/system-clock.ts',
-      'packages/rails/src/live-test/**/*.ts',
+      'packages/rails/src/live/**/*.ts',
     ],
     rules: {
       'no-restricted-properties': 'off',
