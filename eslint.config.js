@@ -131,9 +131,20 @@ export default tseslint.config(
     },
   },
 
-  // Config files and migration scripts are tooling, not run-path code.
+  // Config files and build scripts are tooling, not run-path code. They run
+  // under Node with its globals available, and the determinism bans do not
+  // apply to something that never touches a ledger.
   {
-    files: ['*.config.ts', '*.config.js', 'eslint.config.js', '**/migrate-cli.ts'],
+    files: [
+      '*.config.ts',
+      '*.config.js',
+      'eslint.config.js',
+      '**/migrate-cli.ts',
+      'scripts/**/*.mjs',
+    ],
+    languageOptions: {
+      globals: { process: 'readonly', console: 'readonly' },
+    },
     rules: {
       'no-restricted-properties': 'off',
       'no-restricted-syntax': 'off',
