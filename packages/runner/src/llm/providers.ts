@@ -510,9 +510,28 @@ function truncate(text: string, limit = 400): string {
   return text.length <= limit ? text : `${text.slice(0, limit)}...`;
 }
 
+/**
+ * The retry backoff.
+ *
+ * The timer is deliberately NOT unref'd, and that is the whole point of this
+ * comment. An unref'd timer does not hold the event loop open, and during a
+ * backoff it is frequently the only pending handle: the 429 has been received,
+ * the socket is closed, and nothing else is waiting. Node then exits - cleanly,
+ * with status 0, in the middle of a corpus run.
+ *
+ * That is exactly what happened the first time Gemini rate-limited a family E
+ * run: four of eight scenarios completed, the process exited 0, and
+ * `adversary report` would have built a scorecard over half a corpus without
+ * anything saying so. A partial measurement presented as a whole one is the
+ * failure this project exists to prevent, so it must not be able to happen to
+ * the project itself.
+ *
+ * The wall-clock deadline in `runner.ts` *is* unref'd, correctly - a pending
+ * deadline should never keep a finished process alive. Copying that line here
+ * is how this got in.
+ */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    if (typeof timer === 'object' && 'unref' in timer) timer.unref();
+    setTimeout(resolve, ms);
   });
 }
