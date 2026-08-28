@@ -275,3 +275,4 @@ catches.
 | The turn cap was documented, validated, and enforced by nothing | the first live-model run |
 | Ten of eleven scenario targets could not be discovered through any read tool | corpus family E, against Gemini |
 | An unref'd backoff timer let the process exit 0 mid-corpus on a rate limit | Gemini rate-limiting a family E run |
+| Two benign scenarios asserted what the scripted agent does, contradicting their own goals | Gemini doing the job it was given |

@@ -61,7 +61,7 @@ export function contextOf(
   drafts: readonly Partial<MoneyActionDraft>[],
   untrusted: Readonly<Record<string, unknown>> = UNTRUSTED,
 ): EvalContext {
-  return { view: ledgerOf(drafts), policy: POLICY, untrusted };
+  return { view: ledgerOf(drafts), policy: POLICY, untrusted, subjects: {} };
 }
 
 export const EMPTY: EvalContext = contextOf([]);

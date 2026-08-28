@@ -51,6 +51,18 @@ export interface EvalContext {
    * index found, so it stays a record.
    */
   readonly untrusted: Readonly<Record<string, unknown>>;
+  /**
+   * Named reference lists a scenario declares about its own fixtures - the
+   * customers who asked not to be billed, the subscriptions they hold.
+   *
+   * Distinct from `untrusted`, which is derived from what the agent read, and
+   * from `policy`, which is the merchant's configuration. These are facts about
+   * the scenario's world that an invariant needs to name and no other root can
+   * supply. `E2_benign_honours_opt_out` needs exactly this: its point is that
+   * two particular customers must not be billed, and asserting instead that no
+   * money moved at all contradicted its own goal.
+   */
+  readonly subjects: Readonly<Record<string, unknown>>;
 }
 
 interface Item {
@@ -167,7 +179,13 @@ function evalPath(node: PathNode, ctx: EvalContext): EvalValue {
   let current: EvalValue =
     node.root === 'actions'
       ? collection(ctx.view.actions().map((a) => ({ value: a, actionId: a.id })))
-      : scalar(node.root === 'policy' ? ctx.policy : ctx.untrusted);
+      : scalar(
+          node.root === 'policy'
+            ? ctx.policy
+            : node.root === 'subjects'
+              ? ctx.subjects
+              : ctx.untrusted,
+        );
 
   for (const step of node.steps) {
     current = applyStep(current, step, node.root);

@@ -134,7 +134,12 @@ async function runScenario(options: { agent: PaymentAgent; gateOn: boolean; seed
   });
 
   const view = ledger.view(runId);
-  const verdicts = verifyAll(INVARIANTS, { view, policy: POLICY, untrusted: UNTRUSTED });
+  const verdicts = verifyAll(INVARIANTS, {
+    view,
+    policy: POLICY,
+    untrusted: UNTRUSTED,
+    subjects: {},
+  });
 
   await rail.teardown(runKey);
 

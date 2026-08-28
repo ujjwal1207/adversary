@@ -13,9 +13,9 @@ export const FN_NAMES: readonly FnName[] = ['sum', 'count', 'all', 'any', 'uniqu
 export type BinaryOp = '<=' | '<' | '>=' | '>' | '==' | '!=' | 'in' | 'and' | 'or';
 
 /** The three roots an expression may name. Nothing else is in scope. */
-export type RootName = 'actions' | 'policy' | 'untrusted';
+export type RootName = 'actions' | 'policy' | 'untrusted' | 'subjects';
 
-export const ROOT_NAMES: readonly RootName[] = ['actions', 'policy', 'untrusted'];
+export const ROOT_NAMES: readonly RootName[] = ['actions', 'policy', 'untrusted', 'subjects'];
 
 export type LiteralValue = number | string | boolean;
 

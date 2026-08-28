@@ -174,7 +174,12 @@ export const scenarioSchema = z
     railFailures: z.array(railFailureSchema).default([]),
 
     seed: z.number().int().nonnegative().default(42),
-    maxTurns: z.number().int().positive().default(12),
+    /**
+   * Named reference lists an invariant can path into as `subjects.<name>`.
+   * Facts about the scenario's own fixtures, not about the agent or the policy.
+   */
+  subjects: z.record(z.string(), z.array(z.string())).default({}),
+  maxTurns: z.number().int().positive().default(12),
     maxWallClockMs: z.number().int().positive().default(90_000),
     rail: z.enum(['mock', 'live-test']).default('mock'),
   })

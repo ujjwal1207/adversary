@@ -362,6 +362,7 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
     // their own injection introduced, and an invariant cannot go stale against
     // a payload that changed.
     untrusted: taint.toUntrusted(),
+    subjects: scenario.subjects,
   });
 
   await rail.teardown(runKey);
