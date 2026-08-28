@@ -71,6 +71,21 @@ export interface RunOptions {
    */
   readonly cassetteHash?: string | null;
   readonly clock?: Clock;
+  /**
+   * Overrides the scenario's wall-clock cap.
+   *
+   * A run-level override rather than a scenario edit, unlike `--seed`, because
+   * this is not a property of the scenario: it is a property of how fast the
+   * agent under test happens to be. The corpus values suit `ScriptedAgent`,
+   * which finishes in milliseconds; a hosted model takes seconds per turn and
+   * would be cut off mid-run under the same number.
+   *
+   * Safe to vary because a run that hits the cap is recorded as
+   * `error: wall_clock_exceeded`, and `scorecardFor` excludes errored runs from
+   * every denominator while reporting the count separately. A truncated run
+   * cannot quietly improve a rate; it can only fail to contribute to one.
+   */
+  readonly wallClockMs?: number;
 }
 
 export interface RunResult {
@@ -250,6 +265,7 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
     gate,
     idempotency: new InMemoryIdempotencyStore(),
     onTrajectory: record,
+    onToolCall: () => spendTurn(),
     taintFor: (call) => taint.match(call.payeeRef, call.amountPaise, call.subjectRef),
   });
 
@@ -269,9 +285,38 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
     // one turn.
     onReadCall: (tool, args) => {
       record({ role: 'harness', kind: 'tool_call', content: { tool, ...args } });
+      spendTurn();
     },
   });
   const controller = new AbortController();
+
+  /**
+   * The turn cap, enforced by the harness.
+   *
+   * ARCHITECTURE 14 has always specified this - "runner counter; AbortSignal
+   * fires; run ends" - and until a live model ran, nothing implemented it.
+   * `scenario.maxTurns` was validated by the schema and read by nobody;
+   * `LlmAgent` enforced an unrelated default of its own that happened to be the
+   * same number, so the two agreed by coincidence and `ScriptedAgent` never
+   * loops, which is why no test noticed. Gemini made sixty `escalate_to_human`
+   * calls in one run of corpus E3.
+   *
+   * Counted in tool calls rather than in the agent's idea of a turn, for the
+   * same reason `turnsUsed` is: a turn is the agent's account of itself, and a
+   * tool call is something the harness watched happen. One model response
+   * carrying three calls spends three.
+   *
+   * The signal is the mechanism, so an agent that ignores its signal is still
+   * bounded - by the wall clock, which is the layer beneath this one.
+   */
+  let toolCalls = 0;
+  const spendTurn = (): void => {
+    toolCalls += 1;
+    if (toolCalls >= scenario.maxTurns && !controller.signal.aborted) {
+      error = error ?? 'turn_cap_exceeded';
+      controller.abort();
+    }
+  };
 
   // The wall-clock cap is a safety net for live runs, and it is the one thing
   // in a run that reads real time. A run it fires on carries no determinism
@@ -280,7 +325,7 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
   const deadline = setTimeout(() => {
     error = 'wall_clock_exceeded';
     controller.abort();
-  }, scenario.maxWallClockMs);
+  }, options.wallClockMs ?? scenario.maxWallClockMs);
   if (typeof deadline === 'object' && 'unref' in deadline) deadline.unref();
 
   let finalMessage = '';

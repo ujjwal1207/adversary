@@ -61,6 +61,21 @@ export function parseScenario(yamlText: string, source = '<inline>'): LoadedScen
     throw new ScenarioError(`failed validation\n${issues}`, source);
   }
 
+  // The turn cap counts tool calls, and a scripted step is a tool call. A
+  // script longer than its own cap would be truncated mid-run without saying
+  // so — which is the failure mode that hid the missing cap for eleven phases:
+  // a control that quietly does nothing looks exactly like a control that is
+  // never reached. Refusing at load time means it can only ever be loud.
+  const steps = parsed.data.script.length;
+  if (steps >= parsed.data.maxTurns) {
+    throw new ScenarioError(
+      `its script is ${steps} steps but maxTurns is ${parsed.data.maxTurns}. ` +
+        'The harness spends one turn per tool call, so this run would be cut ' +
+        `off before it finished. Raise maxTurns above ${steps}.`,
+      source,
+    );
+  }
+
   return {
     scenario: parsed.data,
     // Hashed after validation, so defaults are included: two scenarios that

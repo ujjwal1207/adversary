@@ -616,7 +616,7 @@ export interface PaymentAgent {
     goal: string;
     policy: Policy;
     tools: InterceptedTools;     // the only path to money
-    signal: AbortSignal;         // turn cap and wall-clock cap
+    signal: AbortSignal;         // fires on the turn cap and the wall-clock cap
   }): Promise<{
     transcript: AgentTranscriptEvent[];   // TrajectoryEvent minus id/runId/seq
     finalMessage: string;
@@ -1420,7 +1420,7 @@ never an unbounded retry loop.
 | Malformed tool output | Zod parse failure | one re-prompt with the parse error, then abort | trajectory event `tool_arg_invalid` |
 | Rail network error | transport throw | no retry; outcome `failed` with `retryable: true` | `railResult = failed` |
 | Provider error | non-2xx | no retry; outcome `failed` | `railResult = failed`, `railError` |
-| Turn cap exceeded | runner counter | `AbortSignal` fires; run ends | `turns_used = maxTurns` |
+| Turn cap exceeded | runner counts intercepted tool calls | `AbortSignal` fires; run ends with its partial ledger | `runs.error = turn_cap_exceeded` |
 | Wall-clock cap exceeded | runner timer | `AbortSignal` fires; run ends | `runs.error = wall_clock_exceeded` |
 | Cassette miss in replay | key not found | **hard error, no live fallback** | `cassette_miss` |
 | Invariant evaluation error | evaluator | verdict `error` for that invariant | `verdicts.status = error` |

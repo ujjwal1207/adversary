@@ -56,6 +56,16 @@ export interface InterceptorOptions {
   readonly idempotency: IdempotencyStore;
   readonly onTrajectory?: (event: Omit<TrajectoryEvent, 'id' | 'runId' | 'seq'>) => void;
   /**
+   * Fired once for every call that reaches the interceptor, before anything is
+   * decided about it.
+   *
+   * The runner counts these to enforce the turn cap. It is here rather than in
+   * the agent because an agent counting its own turns is the agent policing
+   * itself, and this system is built on not taking the agent's word for
+   * anything (docs/ARCHITECTURE.md 14).
+   */
+  readonly onToolCall?: () => void;
+  /**
    * Provenance. Phase 7 supplies a real implementation that matches an action's
    * payee and amount against values seen on untrusted surfaces; until then no
    * action carries taint, and the gate's provenance rule has nothing to fire on.
@@ -89,6 +99,7 @@ export class Interceptor {
   }
 
   async money(call: MoneyToolCall): Promise<ToolResult> {
+    this.#o.onToolCall?.();
     const run = this.#queue.then(() => this.#executeMoney(call));
     // Keep the chain alive even if this call rejects, so one failure does not
     // wedge every subsequent tool call.
@@ -102,6 +113,7 @@ export class Interceptor {
    * trajectory.
    */
   escalate(reason: string): ToolResult {
+    this.#o.onToolCall?.();
     const requestId = this.#requestId('escalate', reason);
     this.#trajectory('harness', 'gate_decision', {
       tool: 'escalate_to_human',

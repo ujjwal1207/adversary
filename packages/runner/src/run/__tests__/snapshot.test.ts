@@ -17,7 +17,12 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import type { GateComparison } from '@adversary/core';
+import type {
+  AgentContext,
+  AgentRunResult,
+  GateComparison,
+  PaymentAgent,
+} from '@adversary/core';
 import { compareGate, scorecardFor } from '@adversary/core';
 import { createGate } from '@adversary/gate';
 
@@ -247,5 +252,96 @@ describe('buildSnapshot', () => {
     expect(snapshot.runs.every((r) => !r.synthetic)).toBe(true);
 
     await db.close();
+  });
+});
+
+describe('the turn cap', () => {
+  /**
+   * An agent that never stops calling tools.
+   *
+   * Not a strawman: Gemini did exactly this against corpus E3 on the first real
+   * model run — three `read_tickets` calls and then sixty `escalate_to_human`
+   * calls, stopping only when the wall clock fired. Until then the cap
+   * `docs/ARCHITECTURE.md` 14 promises was validated by the schema and enforced
+   * by nothing.
+   */
+  class RunawayAgent implements PaymentAgent {
+    readonly name = 'runaway';
+    readonly version = '1.0.0';
+    calls = 0;
+
+    async run(ctx: AgentContext): Promise<AgentRunResult> {
+      // 500 attempts, and the signal is the only thing that can stop it. If the
+      // cap does not work, this test hangs or floods rather than failing
+      // quietly, which is the right way round.
+      for (let i = 0; i < 500 && !ctx.signal.aborted; i += 1) {
+        this.calls += 1;
+        await ctx.tools.escalate_to_human({ reason: `attempt ${i}` });
+      }
+      return { transcript: [], finalMessage: 'gave up' };
+    }
+  }
+
+  it('stops an agent that will not stop itself', async () => {
+    const loaded = parseScenario(SCENARIO, SOURCE);
+    const agent = new RunawayAgent();
+
+    const result = await runScenario({ loaded, agent, gate: createGate(), attempt: 0 });
+
+    expect(agent.calls).toBeLessThanOrEqual(loaded.scenario.maxTurns);
+    expect(result.error).toBe('turn_cap_exceeded');
+  });
+
+  it("counts tool calls, not the agent's own idea of a turn", async () => {
+    // A turn is what the agent says it did. A tool call is what the harness
+    // watched happen, and only the second is evidence.
+    const loaded = parseScenario(SCENARIO.replace('maxTurns: 8', 'maxTurns: 3'), SOURCE);
+    const agent = new RunawayAgent();
+
+    await runScenario({ loaded, agent, gate: null, attempt: 0 });
+
+    expect(agent.calls).toBe(3);
+  });
+
+  it('leaves a run that stays within the cap untouched', async () => {
+    // The cap must not be reachable by the corpus, or it would silently
+    // truncate scripted runs and move every shipped number.
+    const loaded = parseScenario(SCENARIO, SOURCE);
+    const result = await runScenario({ loaded, gate: createGate(), attempt: 0 });
+
+    expect(result.error).toBeNull();
+  });
+
+  it('records the partial ledger rather than discarding the run', async () => {
+    // "The agent ran out of turns before it finished" is a finding, not a
+    // reason to throw away what it did first (ARCHITECTURE 14).
+    const loaded = parseScenario(SCENARIO, SOURCE);
+
+    class PaysThenLoops implements PaymentAgent {
+      readonly name = 'pays-then-loops';
+      readonly version = '1.0.0';
+      async run(ctx: AgentContext): Promise<AgentRunResult> {
+        await ctx.tools.pay_vendor({
+          vendorId: 'acct_vendor_cedar',
+          amountPaise: 1000,
+          rationale: 'legitimate',
+        });
+        for (let i = 0; i < 100 && !ctx.signal.aborted; i += 1) {
+          await ctx.tools.escalate_to_human({ reason: 'again' });
+        }
+        return { transcript: [], finalMessage: 'stopped' };
+      }
+    }
+
+    const result = await runScenario({
+      loaded,
+      agent: new PaysThenLoops(),
+      gate: createGate(),
+      attempt: 0,
+    });
+
+    expect(result.error).toBe('turn_cap_exceeded');
+    expect(result.actions).toHaveLength(1);
+    expect(result.actions[0]?.railResult).toBe('ok');
   });
 });

@@ -150,6 +150,7 @@ program
   .option('--gate <state>', 'on | off | both', 'both')
   .option('--seed <n>', 'override every scenario seed')
   .option('--agent <name>', 'scripted | ops | naive', 'scripted')
+  .option('--timeout <ms>', "wall-clock cap per run; a live model needs far more than a scenario's default")
   .option('--fresh', 'drop and recreate the database first', false)
   .action(async (target: string | undefined, options: Record<string, unknown>) => {
     const rail = String(options['rail']);
@@ -169,6 +170,16 @@ program
       .map((loaded) => withSeed(loaded, seed));
     const gateStates = gateStatesFor(String(options['gate']));
     const { agent, model, reproducibility } = buildAgent(String(options['agent']));
+
+    // A live model is far slower than the scripted agent the corpus caps were
+    // written for, so the default is raised when one is in play rather than
+    // leaving every run to be cut off mid-flight.
+    const timeoutMs =
+      options['timeout'] !== undefined
+        ? Number(options['timeout'])
+        : agent === null
+          ? undefined
+          : 600_000;
 
     await withDb(async (db) => {
       if (options['fresh'] === true) await reset(db);
@@ -207,6 +218,7 @@ program
             attempt: await nextAttempt(db, runKey),
             model,
             reproducibility,
+            ...(timeoutMs === undefined ? {} : { wallClockMs: timeoutMs }),
           });
           await persistRun(db, result);
 
