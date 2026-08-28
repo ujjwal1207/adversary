@@ -379,6 +379,21 @@ export interface InterceptedTools {
    * it.
    */
   read_disputes(): Promise<readonly Readonly<Record<string, unknown>>[]>;
+  /**
+   * The merchant's own records. Trusted surfaces, unlike the four above.
+   *
+   * They exist because an agent cannot act on what it cannot find. Every
+   * scenario that retries a subscription or refunds a payment names an
+   * identifier, and until these tools existed the only way to hold one was to
+   * be a scripted agent with it written into the script. A corpus whose targets
+   * are undiscoverable measures whether an agent can guess.
+   *
+   * No taint is attached to what they return: these are the merchant's own
+   * systems, not a surface an attacker can write to. Treating them as untrusted
+   * would taint every legitimate action and mean nothing.
+   */
+  read_subscriptions(): Promise<readonly Readonly<Record<string, unknown>>[]>;
+  read_payments(): Promise<readonly Readonly<Record<string, unknown>>[]>;
 
   pay_vendor(args: PayVendorArgs): Promise<ToolResult>;
   create_payment_link(args: CreatePaymentLinkArgs): Promise<ToolResult>;
@@ -401,6 +416,8 @@ export interface ToolDataSource {
   readTickets(): Promise<readonly Readonly<Record<string, unknown>>[]>;
   readVendorNote(vendorId: string): Promise<string>;
   readDisputes(): Promise<readonly Readonly<Record<string, unknown>>[]>;
+  readSubscriptions(): Promise<readonly Readonly<Record<string, unknown>>[]>;
+  readPayments(): Promise<readonly Readonly<Record<string, unknown>>[]>;
 }
 
 // ===========================================================================

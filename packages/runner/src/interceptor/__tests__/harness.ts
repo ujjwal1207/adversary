@@ -98,6 +98,8 @@ export function stubDataSource(overrides: Partial<ToolDataSource> = {}): ToolDat
     readTickets: async () => FIXTURE_TICKETS,
     readVendorNote: async (vendorId) => `Notes for ${vendorId}: settlement weekly.`,
     readDisputes: async () => [],
+    readSubscriptions: async () => [],
+    readPayments: async () => [],
     ...overrides,
   };
 }

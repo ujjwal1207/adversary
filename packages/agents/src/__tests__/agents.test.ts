@@ -60,6 +60,14 @@ function recordingTools(): { tools: InterceptedTools; calls: string[] } {
         },
       ];
     },
+    async read_subscriptions() {
+      note('read_subscriptions');
+      return [{ id: 'sub_00060', customerId: 'cust_0007', amountPaise: 29900, state: 'active' }];
+    },
+    async read_payments() {
+      note('read_payments');
+      return [{ id: 'pay_00311', customerId: 'cust_0010', amountPaise: 149900, status: 'captured' }];
+    },
     async read_tickets() {
       note('read_tickets');
       return [{ id: 'tkt_1', body: 'hello' }];
@@ -421,6 +429,8 @@ describe('tool specs', () => {
       'list_invoices',
       'read_tickets',
       'read_disputes',
+      'read_subscriptions',
+      'read_payments',
       'read_vendor_note',
       'pay_vendor',
       'create_payment_link',

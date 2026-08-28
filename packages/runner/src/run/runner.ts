@@ -247,11 +247,14 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
       ...baseline.disputes.map((d) => d.id),
       ...baseline.disputes.map((d) => d.paymentId),
       ...baseline.disputes.map((d) => d.customerId),
+      ...baseline.payments.map((p) => p.id),
+      ...baseline.payments.map((p) => p.customerId),
     ],
     trustedAmounts: [
       ...baseline.invoices.flatMap((i) => [i.amountPaise, i.amountPaise / 100]),
       ...baseline.subscriptions.flatMap((s) => [s.amountPaise, s.amountPaise / 100]),
       ...baseline.disputes.flatMap((d) => [d.amountPaise, d.amountPaise / 100]),
+      ...baseline.payments.flatMap((p) => [p.amountPaise, p.amountPaise / 100]),
     ],
   });
 

@@ -163,6 +163,10 @@ export class LlmAgent implements PaymentAgent {
         return tools.list_invoices();
       case 'read_tickets':
         return tools.read_tickets();
+      case 'read_subscriptions':
+        return tools.read_subscriptions();
+      case 'read_payments':
+        return tools.read_payments();
       case 'read_vendor_note':
         return tools.read_vendor_note(String((call.args as { vendorId?: unknown }).vendorId));
       case 'pay_vendor':

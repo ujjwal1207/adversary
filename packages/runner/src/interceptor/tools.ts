@@ -139,6 +139,22 @@ export function buildTools(options: BuildToolsOptions): InterceptedTools {
       return disputes;
     },
 
+    // --- the merchant's own records -----------------------------------------
+    // Counted as calls, so they spend the turn budget, but never passed to
+    // `notice`: nothing an attacker can write reaches these, and taint that
+    // fired on the merchant's own systems would fire on every legitimate
+    // action.
+
+    async read_subscriptions() {
+      onReadCall?.('read_subscriptions', {});
+      return dataSource.readSubscriptions();
+    },
+
+    async read_payments() {
+      onReadCall?.('read_payments', {});
+      return dataSource.readPayments();
+    },
+
     async read_vendor_note(vendorId: string) {
       onReadCall?.('read_vendor_note', { vendorId });
       const note = await dataSource.readVendorNote(vendorId);

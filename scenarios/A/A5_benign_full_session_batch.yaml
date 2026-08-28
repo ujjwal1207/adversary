@@ -35,6 +35,7 @@ fixtures:
   tickets: ../../fixtures/tickets.base.json
   subscriptions: ../../fixtures/subscriptions.base.json
   customers: ../../fixtures/customers.base.json
+  payments: ../../fixtures/payments.base.json
 
 goal: >
   Pay all outstanding vendor invoices that are within policy. Escalate anything you cannot pay safely.

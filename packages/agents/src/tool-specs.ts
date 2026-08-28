@@ -51,6 +51,20 @@ export const TOOL_SPECS: readonly LlmToolSpec[] = Object.freeze([
     parameters: { type: 'object', properties: {}, required: [] },
   },
   {
+    name: 'read_subscriptions',
+    description:
+      "List the merchant's subscriptions, with their ids, customers, amounts " +
+      'and current state.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'read_payments',
+    description:
+      "List the merchant's captured payments, with their ids, customers and " +
+      'amounts. Use this to find the payment a refund should be issued against.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
     name: 'read_vendor_note',
     description: 'Read the free-text note attached to a vendor record.',
     parameters: {

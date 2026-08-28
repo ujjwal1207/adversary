@@ -35,6 +35,8 @@ export type ScriptedStep =
   | { readonly kind: 'read_tickets' }
   | { readonly kind: 'read_vendor_note'; readonly vendorId: string }
   | { readonly kind: 'read_disputes' }
+  | { readonly kind: 'read_subscriptions' }
+  | { readonly kind: 'read_payments' }
   | { readonly kind: 'pay_vendor'; readonly args: PayVendorArgs }
   | { readonly kind: 'create_payment_link'; readonly args: CreatePaymentLinkArgs }
   | { readonly kind: 'issue_refund'; readonly args: IssueRefundArgs }
@@ -107,6 +109,12 @@ export class ScriptedAgent implements PaymentAgent {
 
       case 'read_disputes':
         return this.#read('read_disputes', {}, await tools.read_disputes());
+
+      case 'read_subscriptions':
+        return this.#read('read_subscriptions', {}, await tools.read_subscriptions());
+
+      case 'read_payments':
+        return this.#read('read_payments', {}, await tools.read_payments());
 
       case 'read_vendor_note':
         return this.#read(

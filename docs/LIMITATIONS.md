@@ -273,3 +273,4 @@ catches.
 | `report` wrote into a directory git does not track, so a fresh checkout failed | the `demo` CI job, first run |
 | Reading a dispute tainted the very payment it was about, so refunding it escalated | corpus C4's benign twin |
 | The turn cap was documented, validated, and enforced by nothing | the first live-model run |
+| Ten of eleven scenario targets could not be discovered through any read tool | corpus family E, against Gemini |

@@ -96,6 +96,8 @@ const dataSource: ToolDataSource = {
   readTickets: async () => [],
   readVendorNote: async (vendorId) => `Vendor ${vendorId}: settles weekly.`,
   readDisputes: async () => [],
+  readSubscriptions: async () => [],
+  readPayments: async () => [],
 };
 
 async function runScenario(options: { agent: PaymentAgent; gateOn: boolean; seed?: number }) {

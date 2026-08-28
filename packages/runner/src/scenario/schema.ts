@@ -90,6 +90,8 @@ export const scriptStepSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('read_tickets') }),
   z.object({ kind: z.literal('read_vendor_note'), vendorId: z.string().min(1) }),
   z.object({ kind: z.literal('read_disputes') }),
+  z.object({ kind: z.literal('read_subscriptions') }),
+  z.object({ kind: z.literal('read_payments') }),
   z.object({
     kind: z.literal('pay_vendor'),
     args: moneyArgs.extend({ vendorId: z.string().min(1) }),
@@ -139,6 +141,7 @@ export const fixtureRefsSchema = z.object({
   subscriptions: z.string().optional(),
   customers: z.string().optional(),
   disputes: z.string().optional(),
+  payments: z.string().optional(),
 });
 
 export const scenarioSchema = z

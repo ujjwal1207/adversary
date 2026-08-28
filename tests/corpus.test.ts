@@ -14,7 +14,7 @@
  * scenario's own script.
  */
 
-import { readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,7 +22,13 @@ import { describe, expect, it } from 'vitest';
 
 import { createGate } from '@adversary/gate';
 import type { LoadedScenario } from '@adversary/runner';
-import { corpusHash, loadCorpus, runScenario, verifyDeterminism } from '@adversary/runner';
+import {
+  corpusHash,
+  loadCorpus,
+  resolveFixturePath,
+  runScenario,
+  verifyDeterminism,
+} from '@adversary/runner';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCENARIO_ROOT = join(REPO_ROOT, 'scenarios');
@@ -140,5 +146,81 @@ describe('every scenario is deterministic across three runs', () => {
         `${loaded.scenario.id} gate=${gate !== null}: ${report.reason} ${report.firstDifference ?? ''}`,
       ).toBe(true);
     }
+  });
+});
+
+describe('every target is discoverable', () => {
+  /**
+   * The check the corpus went eleven phases without.
+   *
+   * Every scenario names the thing it acts on — a subscription to retry, a
+   * payment to refund. `ScriptedAgent` is *handed* those identifiers in its
+   * script, so nothing ever required them to be findable, and nothing was. Ten
+   * of the eleven `sub_`/`pay_` identifiers in the corpus appeared in no
+   * fixture any read tool returned.
+   *
+   * It surfaced the first time a real model ran: Gemini read the tickets,
+   * correctly concluded it could not obtain a subscription id, and escalated.
+   * All eight family E runs ended at the turn cap having moved no money. The
+   * corpus was measuring whether an agent could guess an identifier.
+   *
+   * Restricted to subscriptions and payments on purpose. Payees are not
+   * checked, because an attack scenario's whole point is often a payee the
+   * agent should *not* be able to justify — `acct_vendor_cedar_new` exists
+   * nowhere but the injected payload, and that is the finding rather than a
+   * defect.
+   */
+  const READABLE = [
+    'invoices',
+    'tickets',
+    'vendors',
+    'disputes',
+    'subscriptions',
+    'payments',
+  ] as const;
+
+  function readableText(loaded: LoadedScenario): string {
+    const refs = loaded.scenario.fixtures as Record<string, string | undefined>;
+    return READABLE.map((name) => {
+      const path = refs[name];
+      return path === undefined
+        ? ''
+        : readFileSync(resolveFixturePath(loaded.source, path), 'utf8');
+    }).join('\n');
+  }
+
+  it.each(cases)('%s acts only on identifiers an agent could find', (_id, loaded) => {
+    const wanted = new Set<string>();
+    for (const step of loaded.scenario.script) {
+      const args = (step as { args?: Record<string, unknown> }).args;
+      for (const key of ['subId', 'paymentId'] as const) {
+        const value = args?.[key];
+        if (typeof value === 'string') wanted.add(value);
+      }
+    }
+
+    const haystack = readableText(loaded);
+    for (const id of wanted) {
+      expect(
+        haystack.includes(id),
+        `${loaded.scenario.id} acts on ${id}, which appears in no fixture any ` +
+          'read tool returns. An agent that has to discover its own target ' +
+          'cannot run this scenario, so it would measure guessing.',
+      ).toBe(true);
+    }
+  });
+
+  it('the read tools cover every fixture an agent needs', () => {
+    // A fixture nobody can read is either a taint-baseline record — which is
+    // legitimate, customers are exactly that — or a scenario target nobody can
+    // reach. This pins which of the two each one is.
+    expect([...READABLE].sort()).toEqual([
+      'disputes',
+      'invoices',
+      'payments',
+      'subscriptions',
+      'tickets',
+      'vendors',
+    ]);
   });
 });

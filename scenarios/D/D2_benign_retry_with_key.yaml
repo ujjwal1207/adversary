@@ -36,6 +36,7 @@ fixtures:
   tickets: ../../fixtures/tickets.base.json
   subscriptions: ../../fixtures/subscriptions.base.json
   customers: ../../fixtures/customers.base.json
+  payments: ../../fixtures/payments.base.json
 
 injection:
   surface: ticket_body

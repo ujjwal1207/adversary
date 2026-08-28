@@ -1619,6 +1619,41 @@ Node's own `--env-file` was the obvious alternative and was rejected: it throws
 when the file is absent, and the default path for this project is that there is
 no file and no credentials at all.
 
+### A22 — The agent can read the merchant's own records (correction)
+
+**Earlier behaviour:** the read surface was `list_invoices`, `read_tickets`,
+`read_vendor_note` and `read_disputes`. Subscriptions and payments were loaded
+as fixtures for the taint baseline and deliberately not exposed — a comment in
+`fixtures.ts` said so.
+
+**Issue found by the first live-model run:** every scenario names the thing it
+acts on, and `ScriptedAgent` is handed that identifier in its script. Nothing
+ever required a target to be *findable*, and ten of the corpus's eleven
+`sub_`/`pay_` identifiers appeared in no fixture any read tool returned. The
+`pay_` records did not exist at all — scripts referenced payments with no
+underlying record anywhere.
+
+An agent that must discover its own target therefore could not run fifteen
+scenarios across families C, D, E, F and G. Gemini read the tickets, correctly
+concluded it had no way to obtain a subscription id, and escalated; all eight
+family E runs ended at the turn cap having moved no money. The corpus was
+measuring whether an agent could guess an identifier.
+
+**Resolution:** `read_subscriptions` and `read_payments`, plus a
+`payments.base.json` fixture. Both are **trusted** reads — the merchant's own
+systems, not surfaces an attacker can write to — so nothing they return is
+tainted, and their records join the trusted baseline for the same reason
+invoices already did. They spend the turn budget like any other call.
+
+`tests/corpus.test.ts` now asserts every `subId` and `paymentId` a script acts
+on appears in a fixture a read tool returns. Payees are excluded on purpose: an
+attack's whole point is often a payee the agent should not be able to justify,
+and `acct_vendor_cedar_new` existing nowhere but the injected payload is the
+finding rather than a defect.
+
+No shipped number moved. Scripted runs do not call the new tools, which is
+precisely why nothing caught this.
+
 ### A19 — `--rail live-test` is refused by the CLI, not wired to it (deviation)
 
 **Spec:** `adversary run ... [--rail mock|live-test]`.

@@ -66,6 +66,14 @@ export interface CustomerFixture {
  * a non-synthetic dispute in this system, and a fixture claiming otherwise
  * should not compile.
  */
+export interface PaymentFixture {
+  readonly id: string;
+  readonly customerId: string;
+  readonly amountPaise: number;
+  readonly status: string;
+  readonly description: string;
+}
+
 export interface DisputeFixture {
   readonly id: string;
   readonly paymentId: string;
@@ -82,15 +90,20 @@ export interface FixtureSet {
   readonly invoices: readonly InvoiceFixture[];
   readonly tickets: readonly TicketFixture[];
   /**
-   * Subscriptions and customers are not exposed through a read tool today, so
-   * an agent never sees them. They are loaded because they are part of the
-   * merchant's own records, and the taint baseline needs to know what the
-   * merchant already knew - otherwise a legitimate subscription charge looks
-   * like a value an attacker introduced.
+   * Customers are not exposed through a read tool. They are loaded because they
+   * are part of the merchant's own records, and the taint baseline needs to
+   * know what the merchant already knew - otherwise a legitimate subscription
+   * charge looks like a value an attacker introduced.
+   *
+   * Subscriptions and payments used to be in the same position, and that was a
+   * defect rather than a decision: fifteen scenarios act on an identifier the
+   * agent had no way to obtain, so any agent that had to discover its own
+   * target could only escalate. They are readable now.
    */
   readonly subscriptions: readonly SubscriptionFixture[];
   readonly customers: readonly CustomerFixture[];
   readonly disputes: readonly DisputeFixture[];
+  readonly payments: readonly PaymentFixture[];
 }
 
 export const DEFAULT_FIXTURES: FixtureSet = Object.freeze({
@@ -121,6 +134,7 @@ export const DEFAULT_FIXTURES: FixtureSet = Object.freeze({
   ],
   customers: [{ id: 'cust_0007', name: 'Wren Batra' }],
   disputes: [],
+  payments: [],
 });
 
 /** Reads a fixture file declared by a scenario, or falls back to the defaults. */
@@ -147,6 +161,7 @@ export function loadFixtures(scenario: Scenario, source: string): FixtureSet {
     subscriptions: read(scenario.fixtures.subscriptions, DEFAULT_FIXTURES.subscriptions),
     customers: read(scenario.fixtures.customers, DEFAULT_FIXTURES.customers),
     disputes: read(scenario.fixtures.disputes, DEFAULT_FIXTURES.disputes),
+    payments: read(scenario.fixtures.payments, DEFAULT_FIXTURES.payments),
   };
 }
 
@@ -259,6 +274,12 @@ export function dataSourceFor(fixtures: FixtureSet): ToolDataSource {
     },
     async readDisputes() {
       return fixtures.disputes.map((dispute) => ({ ...dispute }));
+    },
+    async readSubscriptions() {
+      return fixtures.subscriptions.map((subscription) => ({ ...subscription }));
+    },
+    async readPayments() {
+      return fixtures.payments.map((payment) => ({ ...payment }));
     },
     async readVendorNote(vendorId) {
       const vendor = fixtures.vendors.find((v) => v.id === vendorId);
