@@ -129,7 +129,13 @@ export class CassetteLlm implements LlmClient {
     return completion;
   }
 
-  /** Writes what was recorded. Call once, after the run. */
+  /**
+   * Writes everything recorded so far. Safe to call repeatedly - each call
+   * rewrites the whole file with the cumulative recording, so calling it after
+   * every scenario means a crash mid-corpus keeps what was already paid for.
+   * That is not hypothetical: an unref'd backoff timer once ended a corpus run
+   * four scenarios in.
+   */
   save(): string {
     if (this.#mode !== 'record') {
       throw new CassetteError('save() is only meaningful in record mode.');
@@ -156,6 +162,11 @@ export class CassetteLlm implements LlmClient {
       model: this.model,
       entries: this.#mode === 'record' ? this.#recorded : this.#available,
     });
+  }
+
+  /** Where the recording lives, for messages that tell the user about it. */
+  get path(): string {
+    return this.#path;
   }
 
   /** Entries the cassette holds but this run never asked for. */

@@ -27,7 +27,7 @@ import { compareGate, formatPaise, scorecardFor } from '@adversary/core';
 import { createNaiveOps, createOps } from '@adversary/agents';
 import { createGate } from '@adversary/gate';
 import { renderReport } from '@adversary/report';
-import type { DbHandle, LoadedScenario, ResolvedLlm } from '@adversary/runner';
+import type { CassetteLlm, DbHandle, LoadedScenario, ResolvedLlm } from '@adversary/runner';
 import {
   assertSchemaComplete,
   buildSnapshot,
@@ -169,7 +169,14 @@ program
     const scenarios = select(target, options['family'] as string | undefined, options['all'] === true)
       .map((loaded) => withSeed(loaded, seed));
     const gateStates = gateStatesFor(String(options['gate']));
-    const { agent, model, reproducibility } = buildAgent(String(options['agent']));
+    const { agent, model, reproducibility, cassette } = buildAgent(String(options['agent']));
+
+    // In replay the hash is fixed up front and every run row carries it, so a
+    // scorecard can cite which recording produced its numbers. A recording
+    // pass gets null: its runs are live-tier, and stamping the hash of a
+    // cassette that does not exist yet would name nothing.
+    const recording = cassette !== null && reproducibility !== 'cassette';
+    const cassetteHash = cassette !== null && !recording ? cassette.hash : null;
 
     // A live model is far slower than the scripted agent the corpus caps were
     // written for, so the default is raised when one is in play rather than
@@ -190,7 +197,12 @@ program
           `gate ${gateStates.map((g) => (g ? 'on' : 'off')).join(' and ')}, ` +
           `agent ${agent === null ? 'per-scenario script' : agent.name}` +
           (model === null ? '' : ` · ${model}`) +
-          (agent === null ? '' : describeEnv()),
+          (agent === null ? '' : describeEnv()) +
+          (cassette === null
+            ? ''
+            : recording
+              ? ` · recording ${cassette.path}`
+              : ` · replaying ${cassette.path}`),
       );
 
       for (const loaded of scenarios) {
@@ -219,8 +231,17 @@ program
             model,
             reproducibility,
             ...(timeoutMs === undefined ? {} : { wallClockMs: timeoutMs }),
+            cassetteHash,
           });
           await persistRun(db, result);
+
+          // After every run, not once at the end: the recording is the
+          // expensive artefact, and a crash mid-corpus must not discard the
+          // completions already paid for. Until this call existed, record mode
+          // accumulated everything in memory and wrote nothing at all - the
+          // CLI dropped the handle, and a "recording" run exited 0 having
+          // recorded nothing anyone could replay.
+          if (recording) (cassette as CassetteLlm).save();
 
           console.log(
             `  ${result.verdict.padEnd(8)} ${loaded.scenario.id}` +
@@ -228,6 +249,20 @@ program
               (result.error === null ? '' : `  ERROR ${result.error}`),
           );
         }
+      }
+
+      if (recording) {
+        const hash = (cassette as CassetteLlm).save();
+        console.log(`
+cassette written to ${(cassette as CassetteLlm).path} (${hash.slice(0, 16)}…)
+replay it - no key needed - with:
+  ADVERSARY_CASSETTE=${(cassette as CassetteLlm).path} ADVERSARY_CASSETTE_MODE=replay`);
+      } else if (cassette !== null && cassette.unusedEntries > 0) {
+        console.log(`
+note: ${cassette.unusedEntries} cassette entr${
+          cassette.unusedEntries === 1 ? 'y was' : 'ies were'
+        } never requested. The scenarios have drifted from what was recorded; ` +
+          're-record before trusting a full-corpus replay.');
       }
 
       console.log(`
@@ -275,8 +310,10 @@ function buildAgent(name: string): {
   agent: PaymentAgent | null;
   model: string | null;
   reproducibility: ReproducibilityTier;
+  cassette: CassetteLlm | null;
 } {
-  if (name === 'scripted') return { agent: null, model: null, reproducibility: 'scripted' };
+  if (name === 'scripted')
+    return { agent: null, model: null, reproducibility: 'scripted', cassette: null };
   if (name !== 'ops' && name !== 'naive') {
     fail(`--agent expects scripted, ops or naive; got "${name}".`);
   }
@@ -285,7 +322,12 @@ function buildAgent(name: string): {
   const agent =
     name === 'ops' ? createOps({ llm: llm.client }) : createNaiveOps({ llm: llm.client });
 
-  return { agent, model: llm.model, reproducibility: llm.reproducibility };
+  return {
+    agent,
+    model: llm.model,
+    reproducibility: llm.reproducibility,
+    cassette: llm.cassette,
+  };
 }
 
 /**
