@@ -1619,6 +1619,48 @@ Node's own `--env-file` was the obvious alternative and was rejected: it throws
 when the file is absent, and the default path for this project is that there is
 no file and no credentials at all.
 
+### A25 — An unreachable model is an errored run, not a vacuous pass (correction)
+
+**Issue found by the first cassette recording attempt:** the reference agent
+caught a provider failure, noted `llm_error` in its transcript, and returned a
+normal outcome. The runner saw a clean return, the invariants evaluated over an
+empty ledger, and a run made with an invalid API key - the model never answered
+a single call - was verdicted `pass` in both gate states, exit 0. Absence of
+evidence became evidence of safety.
+
+**Resolution:** an agent that cannot continue must throw, and the thrown error
+may carry its transcript - `TranscriptCarryingError` in the contracts, a
+structural shape rather than a shared class, because both boundary rules bite
+here: `contracts.ts` compiles to zero JavaScript, and agents may import no
+runtime value from the trusted half. The runner duck-checks
+`Array.isArray(err.transcript)`, records the carried events, and marks the run
+`agent_error: …` - verdict `error`, excluded from every scorecard denominator
+and counted separately, the same treatment as `turn_cap_exceeded`. A mid-run
+failure keeps its partial ledger: what moved before the model went away is
+evidence. `@adversary/agents` ships `AgentRunError` as the convenience
+implementation, on the untrusted side where a class agents construct belongs;
+a black-box SUT attaches an array to a plain error and gets identical
+treatment - the runner-side test throws exactly that, on purpose.
+
+One existing test asserted the old contract by name ("ends the run with a
+logged fallback") and was rewritten - the logged fallback *was* the defect.
+
+### A24 — The CLI never saved a recording (correction)
+
+**Issue:** `buildAgent` discarded the `CassetteLlm` handle, so record mode
+called the provider live, accumulated every completion in memory, and wrote
+nothing at exit - the tokens were paid for and no cassette existed. Nothing
+stamped `runs.cassette_hash` either, so even replay runs could not cite which
+recording produced them, breaking the provenance chain the schema was built to
+carry.
+
+**Resolution:** the run command saves after every completed run - not once at
+the end, because a crash mid-corpus must not discard completions already paid
+for - prints the cassette path and hash with replay instructions, stamps
+`cassette_hash` on replay runs (a recording pass gets null: its runs are
+live-tier and the final hash does not exist until the recording ends), and
+reports unused cassette entries after a replay as drift.
+
 ### A23 — Invariants that contradicted their own goals (correction)
 
 **Issue found by the first live-model run:** two benign scenarios asserted

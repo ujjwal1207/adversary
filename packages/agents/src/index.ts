@@ -29,3 +29,4 @@ export { TOOL_NAMES, TOOL_SPECS } from './tool-specs.js';
 
 export type { ScriptedLlmOptions } from './testing/scripted-llm.js';
 export { ScriptedLlm, ScriptedLlmError, callsTool, says } from './testing/scripted-llm.js';
+export { AgentRunError } from './errors.js';

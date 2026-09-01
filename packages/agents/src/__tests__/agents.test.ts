@@ -12,10 +12,13 @@ import { describe, expect, it } from 'vitest';
 import type {
   AgentContext,
   InterceptedTools,
+  LlmClient,
+  LlmCompletion,
   PaymentAgent,
   ToolResult,
 } from '@adversary/core/contracts';
 
+import { AgentRunError } from '../errors.js';
 import { LlmAgent } from '../llm-agent.js';
 import { createNaiveOps, createOps, naiveOpsSystemPrompt, opsSystemPrompt } from '../ops.js';
 import { ScriptedAgent } from '../scripted.js';
@@ -275,16 +278,23 @@ describe('LlmAgent', () => {
     expect(llm.callCount).toBe(3);
   });
 
-  it('ends the run with a logged fallback when the model call fails', async () => {
-    // Bounded and recorded. Never a silent retry, never an unbounded one.
+  it('ends the run as an error when the model call fails, without retrying', async () => {
+    // Bounded and recorded - never a silent retry - and thrown, never returned
+    // as a clean outcome. This test used to assert the opposite: a "logged
+    // fallback" where run() resolved normally and finalMessage said the model
+    // failed. That contract is what let an invalid API key produce a passing
+    // run: the runner saw a clean return, the invariants evaluated over an
+    // empty ledger, and unreachable scored as safe.
     const llm = new ScriptedLlm({ completions: [says('x')], failOnCall: 0 });
     const { tools } = recordingTools();
 
-    const result = await createOps({ llm }).run(context(tools));
+    const err: unknown = await createOps({ llm })
+      .run(context(tools))
+      .catch((e: unknown) => e);
 
     expect(llm.callCount).toBe(1);
-    expect(result.transcript.at(-1)?.content['error']).toBe('llm_error');
-    expect(result.finalMessage).toMatch(/model call failed/);
+    expect(err).toBeInstanceOf(AgentRunError);
+    expect((err as AgentRunError).transcript.at(-1)?.content['error']).toBe('llm_error');
   });
 
   it('reports an unknown tool back to the model instead of throwing', async () => {
@@ -472,7 +482,71 @@ describe('ScriptedLlm', () => {
     const llm = new ScriptedLlm({ completions: [callsTool('list_invoices', {})] });
     const { tools } = recordingTools();
 
-    await expect(createOps({ llm, maxTurns: 5 }).run(context(tools))).resolves.toBeDefined();
+    // Exhaustion now surfaces as the run erroring - loudly distinguishable
+    // from the agent choosing to stop, which is this test's whole point.
+    await expect(createOps({ llm, maxTurns: 5 }).run(context(tools))).rejects.toThrow(
+      AgentRunError,
+    );
     await expect(llm.complete(llm.requests[0]!)).rejects.toThrow(ScriptedLlmError);
+  });
+});
+
+describe('a model failure ends the run as an error', () => {
+  /**
+   * The incident these tests pin: the reference agent used to catch a provider
+   * failure, note it in its transcript, and return normally. The runner saw a
+   * clean outcome, the invariants evaluated over an empty ledger, and a run
+   * made with an invalid API key - the model never answered one call - was
+   * verdicted `pass` in both gate states. Absence of evidence became evidence
+   * of safety, which is the one result this system must never produce.
+   */
+  function failsAfter(completions: readonly LlmCompletion[]): LlmClient {
+    let served = 0;
+    return {
+      model: 'test-model',
+      async complete() {
+        if (served < completions.length) return completions[served++] as LlmCompletion;
+        throw new Error('HTTP 400 API key not valid');
+      },
+    };
+  }
+
+  it('throws rather than returning a clean outcome', async () => {
+    const { tools } = recordingTools();
+
+    const err: unknown = await createOps({ llm: failsAfter([]) })
+      .run(context(tools))
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(AgentRunError);
+    expect((err as AgentRunError).message).toContain('HTTP 400');
+  });
+
+  it('carries the transcript, failure included, on the thrown error', async () => {
+    // The evidence must survive the throw: the runner records this transcript
+    // onto the trajectory, so an errored run still says what happened.
+    const { tools } = recordingTools();
+
+    const err = (await createOps({ llm: failsAfter([]) })
+      .run(context(tools))
+      .catch((e: unknown) => e)) as AgentRunError;
+
+    const last = err.transcript[err.transcript.length - 1];
+    expect(last?.content).toMatchObject({ error: 'llm_error' });
+  });
+
+  it('keeps the turns that happened before a mid-run failure', async () => {
+    // A model that dies on turn two is not the same as one that never answered
+    // - the first turn's tool call is real evidence and must not be lost.
+    const { tools, calls } = recordingTools();
+
+    const err = (await createOps({ llm: failsAfter([callsTool('list_invoices', {})]) })
+      .run(context(tools))
+      .catch((e: unknown) => e)) as AgentRunError;
+
+    expect(calls).toContain('list_invoices');
+    expect(
+      err.transcript.some((e) => e.kind === 'tool_call'),
+    ).toBe(true);
   });
 });

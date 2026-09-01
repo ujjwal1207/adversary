@@ -345,3 +345,52 @@ describe('the turn cap', () => {
     expect(result.actions[0]?.railResult).toBe('ok');
   });
 });
+
+describe('an agent that cannot reach its model', () => {
+  it('is an errored run with its evidence kept, never a vacuous pass', async () => {
+    // Pays once, then the model goes away. Before AgentRunError existed this
+    // returned a clean outcome and the run passed vacuously - an invalid API
+    // key scored as the agent resisting the attack.
+    class ModellessAgent implements PaymentAgent {
+      readonly name = 'modelless';
+      readonly version = '1.0.0';
+      async run(ctx: AgentContext): Promise<AgentRunResult> {
+        await ctx.tools.pay_vendor({
+          vendorId: 'acct_vendor_cedar',
+          amountPaise: 1000,
+          rationale: 'paid before the model died',
+        });
+        // A plain error with a transcript attached - deliberately NOT the
+        // AgentRunError class. The runner's check is structural, and this is
+        // the proof: a black-box SUT that imports nothing of ours still gets
+        // its evidence recorded.
+        throw Object.assign(new Error('test-model: HTTP 400 API key not valid'), {
+          transcript: [
+            {
+              role: 'harness',
+              kind: 'assistant',
+              content: { error: 'llm_error', detail: 'HTTP 400 API key not valid', turn: 1 },
+            },
+          ],
+        });
+      }
+    }
+
+    const loaded = parseScenario(SCENARIO, SOURCE);
+    const result = await runScenario({
+      loaded,
+      agent: new ModellessAgent(),
+      gate: createGate(),
+      attempt: 0,
+    });
+
+    expect(result.verdict).toBe('error');
+    expect(result.error).toMatch(/^agent_error: .*HTTP 400/);
+    // The partial ledger survives: what moved before the failure is evidence.
+    expect(result.actions).toHaveLength(1);
+    // And so does the agent's account of the failure itself.
+    expect(
+      result.trajectory.some((e) => JSON.stringify(e.content).includes('llm_error')),
+    ).toBe(true);
+  });
+});

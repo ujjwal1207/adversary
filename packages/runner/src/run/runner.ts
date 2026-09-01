@@ -23,6 +23,7 @@ import type {
   PolicyGate,
   ReproducibilityTier,
   TrajectoryEvent,
+  TranscriptCarryingError,
 } from '@adversary/core';
 import {
   InMemoryLedger,
@@ -342,6 +343,15 @@ export async function runScenario(options: RunOptions): Promise<RunResult> {
     finalMessage = outcome.finalMessage;
     for (const event of outcome.transcript) record(event);
   } catch (err) {
+    // A thrown failure may carry the agent's transcript (TranscriptCarryingError
+    // in the contracts). Checked structurally, not with instanceof: agents may
+    // import no runtime value from the trusted half, and a black-box SUT gets
+    // the same evidence-preserving treatment by attaching an array to a plain
+    // error. For a mid-run failure that transcript holds every turn before the
+    // model went away; losing it would leave an errored run with no account of
+    // how far it got.
+    const carried = (err as Partial<TranscriptCarryingError>).transcript;
+    if (Array.isArray(carried)) for (const event of carried) record(event);
     error ??= `agent_error: ${err instanceof Error ? err.message : String(err)}`;
   } finally {
     clearTimeout(deadline);

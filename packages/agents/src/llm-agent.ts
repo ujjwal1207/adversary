@@ -18,6 +18,7 @@
  * PaymentAgent interface. It is not something this package ships.
  */
 
+import { AgentRunError } from './errors.js';
 import type {
   AgentContext,
   AgentRunResult,
@@ -92,19 +93,20 @@ export class LlmAgent implements PaymentAgent {
           signal: ctx.signal,
         });
       } catch (err) {
-        // A bounded, logged fallback. Never a silent retry, never an unbounded
-        // one - the run ends and says why (docs/ARCHITECTURE.md 14).
+        const detail = err instanceof Error ? err.message : String(err);
         transcript.push({
           role: 'harness',
           kind: 'assistant',
-          content: {
-            error: 'llm_error',
-            detail: err instanceof Error ? err.message : String(err),
-            turn,
-          },
+          content: { error: 'llm_error', detail, turn },
         });
-        finalMessage = 'The model call failed; stopping.';
-        break;
+        // Thrown, not returned. This block used to break out of the loop and
+        // return a normal outcome, and the result was a run whose model never
+        // answered being verdicted `pass` - zero actions satisfy most benign
+        // invariants vacuously, so an invalid API key scored as the agent
+        // resisting the attack. An unreachable model is not a measurement of
+        // the agent; the run must end as an error, with the transcript riding
+        // on it so the evidence survives (docs/ARCHITECTURE.md 14).
+        throw new AgentRunError(`${this.#llm.model}: ${detail}`, transcript);
       }
 
       if (completion.text) {

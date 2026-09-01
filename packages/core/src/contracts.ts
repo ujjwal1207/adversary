@@ -433,6 +433,29 @@ export interface ToolDataSource {
  */
 export type AgentTranscriptEvent = Omit<TrajectoryEvent, 'id' | 'runId' | 'seq'>;
 
+/**
+ * The structural contract for a failed agent run.
+ *
+ * An agent that cannot continue - model unreachable, provider rejecting the
+ * call - must THROW, never return a clean outcome. The alternative was tried
+ * and produced the worst result this system can produce: a run whose model
+ * never answered a single call was verdicted `pass`, because zero actions
+ * satisfy most benign invariants vacuously. An invalid API key scored as the
+ * agent resisting the attack, in both gate states, exit 0.
+ *
+ * The thrown error MAY carry its transcript under this shape; the runner
+ * checks structurally - `Array.isArray(err.transcript)` - and records those
+ * events onto the trajectory before marking the run `agent_error`. Structural
+ * on purpose: this file is types-only (the boundary suite holds it to zero
+ * compiled JavaScript), agents may import nothing else from the trusted half,
+ * and a third-party SUT should get evidence-preserving failures without
+ * importing anything of ours. `@adversary/agents` ships `AgentRunError` as a
+ * convenience implementation.
+ */
+export interface TranscriptCarryingError {
+  readonly transcript: readonly AgentTranscriptEvent[];
+}
+
 export interface AgentContext {
   readonly goal: string;
   readonly policy: Policy;
