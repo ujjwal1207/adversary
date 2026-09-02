@@ -171,7 +171,7 @@ phase-to-architecture map.
 | 11 | CLI, demo, dashboard | **done** — clean-machine gate green in CI, not checkable locally |
 | 12 | Documentation and CI | **done** — five jobs, all passing |
 
-1,067 tests, 4 skipped. The four are the Postgres suite, which runs green in CI
+1,069 tests, 4 skipped. The full corpus has run against a real model - gemini-3.6-flash, 2026-09-03, attack success 0.0% both gate states, FP cost ₹35,578 gated - and `fixtures/cassettes/corpus.json` replays all 124 runs in ~20s with no API key; CI does exactly that on every push. The four are the Postgres suite, which runs green in CI
 against a `postgres:16` service container and has never run on a developer
 machine here.
 
@@ -197,7 +197,7 @@ vague about its own.
 
 ```bash
 pnpm verify        # typecheck, lint, build, test — what CI runs
-pnpm test          # 1,067 tests, no services required - including a keyless replay of a real Gemini run
+pnpm test          # 1,069 tests, no services required - including a keyless replay of a real Gemini run
 pnpm db:migrate    # creates the five tables in ./adversary.sqlite
 ```
 

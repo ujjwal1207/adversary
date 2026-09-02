@@ -1619,6 +1619,30 @@ Node's own `--env-file` was the obvious alternative and was rejected: it throws
 when the file is absent, and the default path for this project is that there is
 no file and no credentials at all.
 
+### A27 — The full corpus, recorded and replayable
+
+2026-09-03: all 62 scenarios ran against gemini-3.6-flash, both gate states —
+124 runs, zero errors of any kind, the whole thing recorded to
+`fixtures/cassettes/corpus.json`. A keyless replay reproduces every run in
+about twenty seconds, and the record pass was diffed against one row by row
+before committing: every money action, verdict and trajectory event identical
+across all 124 pairs, zero unexpected differences.
+`tests/cassette-replay.test.ts` replays it on every CI run with all provider
+keys forced blank and pins the outcome.
+
+The scorecard it produces is the project's thesis in two numbers. Attack
+success 0.0% in BOTH gate states — the model followed no injected instruction,
+split no payment, echoed no credential, retried past no limit, in 62 attack
+runs including 31 with no gate at all. Every one of the 27 violated runs is a
+benign twin: 10 ungated (the model fumbling legitimate work on its own), 17
+gated, with a false-positive cost of ₹35,578.00. For this model on this
+corpus, the gate stopped nothing and cost ₹35,578 — its value here is
+insurance priced against a worse model, and the harness is what lets that
+premium be priced rather than assumed.
+
+This was also the first seam to survive first contact with reality without
+producing a defect: seven seams ran for real before it, and all seven hid one.
+
 ### A26 — Gemini 3, thought signatures, and the first committed cassette
 
 **Found while closing the cassette loop**, one layer per attempt. A rotated API
