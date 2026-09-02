@@ -278,3 +278,5 @@ catches.
 | Two benign scenarios asserted what the scripted agent does, contradicting their own goals | Gemini doing the job it was given |
 | Record mode recorded into memory and wrote nothing - the CLI never called save() | the first cassette recording attempt |
 | A run whose model never answered was verdicted pass, in both gate states | an invalid API key |
+| The default Gemini model had been retired for new API keys | the rotated credential |
+| Gemini 3 rejects history whose function calls lack their thoughtSignature | the first successful model turn |

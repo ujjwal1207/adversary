@@ -492,6 +492,18 @@ export interface LlmToolCall {
   readonly id: string;
   readonly name: string;
   readonly args: Readonly<Record<string, unknown>>;
+  /**
+   * Opaque provider state that must survive the round trip.
+   *
+   * Set by a provider when it parses a completion; echoed back verbatim when
+   * the same call is serialized into a later request; never read by the agent.
+   * Exists because Gemini 3 rejects a conversation whose earlier function
+   * calls come back without their `thoughtSignature` (HTTP 400, found on this
+   * project's first successful model turn), and Anthropic's extended thinking
+   * carries signed blocks with the same echo-it-back contract. The cassette
+   * stores completions whole, so recordings preserve it automatically.
+   */
+  readonly providerData?: Readonly<Record<string, unknown>>;
 }
 
 export interface LlmMessage {

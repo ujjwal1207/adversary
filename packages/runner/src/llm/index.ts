@@ -159,7 +159,10 @@ export function llmConfigFromEnv(
     return {
       provider: 'gemini',
       apiKey: gemini,
-      model: env['ADVERSARY_MODEL']?.trim() || 'gemini-2.5-flash',
+      // 2.5-flash returns HTTP 404 for API keys created after roughly
+      // September 2026 ("no longer available to new users"), so the default
+      // tracks what a fresh key can actually call. ADVERSARY_MODEL overrides.
+      model: env['ADVERSARY_MODEL']?.trim() || 'gemini-3.6-flash',
       ...(cassette === undefined ? {} : { cassette }),
     };
   }

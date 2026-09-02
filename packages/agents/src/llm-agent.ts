@@ -106,7 +106,10 @@ export class LlmAgent implements PaymentAgent {
         // resisting the attack. An unreachable model is not a measurement of
         // the agent; the run must end as an error, with the transcript riding
         // on it so the evidence survives (docs/ARCHITECTURE.md 14).
-        throw new AgentRunError(`${this.#llm.model}: ${detail}`, transcript);
+        // The detail as-is: every provider already prefixes its own model name
+        // ("gemini-…: HTTP 404 …"), and prefixing again produced
+        // "gemini-…: gemini-…: HTTP 404" in the first real failure.
+        throw new AgentRunError(detail, transcript);
       }
 
       if (completion.text) {

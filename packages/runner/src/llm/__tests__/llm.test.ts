@@ -673,7 +673,7 @@ describe('llmConfigFromEnv', () => {
     // The console hands out one or the other depending on where you got it.
     expect(llmConfigFromEnv({ GEMINI_API_KEY: 'g' })?.provider).toBe('gemini');
     expect(llmConfigFromEnv({ GOOGLE_API_KEY: 'g' })?.provider).toBe('gemini');
-    expect(llmConfigFromEnv({ GEMINI_API_KEY: 'g' })?.model).toBe('gemini-2.5-flash');
+    expect(llmConfigFromEnv({ GEMINI_API_KEY: 'g' })?.model).toBe('gemini-3.6-flash');
   });
 
   it('checks the three providers in a fixed order', () => {
@@ -723,5 +723,97 @@ describe('createLlmClient', () => {
       cassette: { mode: 'record', path: join(scratch(), 'new.json') },
     });
     expect(resolved.reproducibility).toBe('live');
+  });
+});
+
+describe('Gemini thought signatures', () => {
+  /**
+   * Found on this project's first successful model turn, ever. Gemini 3
+   * attaches a `thoughtSignature` to the function calls of a thinking model
+   * and rejects any later request whose history omits it - HTTP 400, at
+   * "position 2", meaning the first turn worked and the second could never
+   * be sent. The signature rides the tool call as opaque `providerData`: the
+   * agent echoes the call object back untouched, so the round trip needs no
+   * agent knowledge, and the cassette stores completions whole, so recordings
+   * preserve it for free.
+   */
+  const signedBody = {
+    candidates: [
+      {
+        content: {
+          role: 'model',
+          parts: [
+            { text: 'Reasoning to myself.', thought: true },
+            { text: 'Paying now.' },
+            {
+              functionCall: { name: 'pay_vendor', args: { vendorId: 'acct_vendor_acme' } },
+              thoughtSignature: 'sig_abc',
+            },
+          ],
+        },
+        finishReason: 'STOP',
+      },
+    ],
+  };
+
+  it('captures the signature and keeps thought text out of the reply', async () => {
+    const result = await new GeminiLlm({
+      apiKey: 'k',
+      model: 'gemini-3.6-flash',
+      fetchImpl: fakeFetch(signedBody),
+    }).complete(REQUEST);
+
+    expect(result.text).toBe('Paying now.');
+    expect(result.toolCalls[0]?.providerData).toEqual({ thoughtSignature: 'sig_abc' });
+  });
+
+  it('echoes the signature back when the call re-enters the history', async () => {
+    const fetch = fakeFetch(signedBody);
+    await new GeminiLlm({ apiKey: 'k', model: 'gemini-3.6-flash', fetchImpl: fetch }).complete({
+      ...REQUEST,
+      messages: [
+        { role: 'user', content: 'pay acme' },
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            {
+              id: 'pay_vendor#0',
+              name: 'pay_vendor',
+              args: { vendorId: 'acct_vendor_acme' },
+              providerData: { thoughtSignature: 'sig_abc' },
+            },
+          ],
+        },
+        { role: 'tool', content: '{"ok":true}', toolCallId: 'pay_vendor#0' },
+      ],
+    });
+
+    const sent = (fetch.calls[0] as { body: { contents: { parts: unknown[] }[] } }).body;
+    expect(sent.contents[1]?.parts[0]).toEqual({
+      functionCall: { name: 'pay_vendor', args: { vendorId: 'acct_vendor_acme' } },
+      thoughtSignature: 'sig_abc',
+    });
+  });
+
+  it('omits the key entirely for a call that never carried one', async () => {
+    // An invented or empty signature is worse than none.
+    const fetch = fakeFetch(signedBody);
+    await new GeminiLlm({ apiKey: 'k', model: 'gemini-3.6-flash', fetchImpl: fetch }).complete({
+      ...REQUEST,
+      messages: [
+        { role: 'user', content: 'pay acme' },
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [{ id: 'pay_vendor#0', name: 'pay_vendor', args: {} }],
+        },
+        { role: 'tool', content: '{"ok":true}', toolCallId: 'pay_vendor#0' },
+      ],
+    });
+
+    const sent = (fetch.calls[0] as { body: { contents: { parts: Record<string, unknown>[] }[] } })
+      .body;
+    expect(sent.contents[1]?.parts[0]).not.toHaveProperty('thoughtSignature');
   });
 });

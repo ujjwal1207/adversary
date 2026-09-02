@@ -391,14 +391,24 @@ export class GeminiLlm extends HttpLlm {
     )) as {
       candidates?: {
         content?: {
-          parts?: { text?: string; functionCall?: { name?: string; args?: unknown } }[];
+          parts?: {
+            text?: string;
+            thought?: boolean;
+            thoughtSignature?: string;
+            functionCall?: { name?: string; args?: unknown };
+          }[];
         };
         finishReason?: string;
       }[];
     };
 
     const parts = raw.candidates?.[0]?.content?.parts ?? [];
-    const text = parts.map((part) => part.text ?? '').join('');
+    // Thought summaries are the model talking to itself, not to the merchant;
+    // they are excluded from the text the agent treats as the reply.
+    const text = parts
+      .filter((part) => part.thought !== true)
+      .map((part) => part.text ?? '')
+      .join('');
 
     const toolCalls: LlmToolCall[] = parts
       .filter((part) => part.functionCall !== undefined)
@@ -406,6 +416,12 @@ export class GeminiLlm extends HttpLlm {
         id: encodeGeminiCallId(String(part.functionCall?.name ?? ''), index),
         name: String(part.functionCall?.name ?? ''),
         args: (part.functionCall?.args ?? {}) as Record<string, unknown>,
+        // Gemini 3 rejects a later request whose history omits this - HTTP
+        // 400, "Function call is missing a thought_signature" - so it rides
+        // the call as opaque providerData and toGeminiContent echoes it.
+        ...(part.thoughtSignature === undefined
+          ? {}
+          : { providerData: { thoughtSignature: part.thoughtSignature } }),
       }));
 
     return {
@@ -463,7 +479,13 @@ function toGeminiContent(message: {
     const parts: unknown[] = [];
     if (message.content) parts.push({ text: message.content });
     for (const call of message.toolCalls) {
-      parts.push({ functionCall: { name: call.name, args: call.args } });
+      const signature = call.providerData?.['thoughtSignature'];
+      parts.push({
+        functionCall: { name: call.name, args: call.args },
+        // Echoed verbatim when present, omitted when not: an empty or invented
+        // signature is worse than none.
+        ...(typeof signature === 'string' ? { thoughtSignature: signature } : {}),
+      });
     }
     return { role: 'model', parts };
   }

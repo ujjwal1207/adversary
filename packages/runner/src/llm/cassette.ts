@@ -169,6 +169,11 @@ export class CassetteLlm implements LlmClient {
     return this.#path;
   }
 
+  /** How many completions this cassette holds. */
+  get entryCount(): number {
+    return this.#mode === 'record' ? this.#recorded.length : this.#available.length;
+  }
+
   /** Entries the cassette holds but this run never asked for. */
   get unusedEntries(): number {
     return this.#mode === 'replay' ? this.#available.length - this.#consumed.size : 0;

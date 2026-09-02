@@ -253,11 +253,20 @@ program
 
       if (recording) {
         const hash = (cassette as CassetteLlm).save();
-        console.log(`
-cassette written to ${(cassette as CassetteLlm).path} (${hash.slice(0, 16)}…)
-replay it - no key needed - with:
-  ADVERSARY_CASSETTE=${(cassette as CassetteLlm).path} ADVERSARY_CASSETTE_MODE=replay`);
+        if ((cassette as CassetteLlm).entryCount === 0) {
+          // Every model call failed, so there is nothing to replay. The first
+          // real recording attempt hit exactly this - an invalid key - and
+          // printing the replay invitation for a cassette of nothing would
+          // send someone to a guaranteed hard error with instructions
+          // attached.
+          console.log(`
+cassette ${(cassette as CassetteLlm).path} holds 0 completions - every model ` +
+            `call failed. Fix the failure above and re-record; there is nothing to replay.`);
+        } else {
+          printReplayHint(cassette as CassetteLlm, hash);
+        }
       } else if (cassette !== null && cassette.unusedEntries > 0) {
+
         console.log(`
 note: ${cassette.unusedEntries} cassette entr${
           cassette.unusedEntries === 1 ? 'y was' : 'ies were'
@@ -270,6 +279,13 @@ stored in ${describeConfig(dbConfigFromEnv())}`);
       console.log('run `adversary report` to build a scorecard.');
     });
   });
+
+function printReplayHint(cassette: CassetteLlm, hash: string): void {
+  console.log(`
+cassette written to ${cassette.path} (${hash.slice(0, 16)}…)
+replay it - no key needed - with:
+  ADVERSARY_CASSETTE=${cassette.path} ADVERSARY_CASSETTE_MODE=replay`);
+}
 
 function gateStatesFor(value: string): boolean[] {
   if (value === 'on') return [true];
