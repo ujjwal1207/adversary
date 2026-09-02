@@ -171,7 +171,7 @@ phase-to-architecture map.
 | 11 | CLI, demo, dashboard | **done** — clean-machine gate green in CI, not checkable locally |
 | 12 | Documentation and CI | **done** — five jobs, all passing |
 
-1,063 tests, 4 skipped. The four are the Postgres suite, which runs green in CI
+1,067 tests, 4 skipped. The four are the Postgres suite, which runs green in CI
 against a `postgres:16` service container and has never run on a developer
 machine here.
 
@@ -197,7 +197,7 @@ vague about its own.
 
 ```bash
 pnpm verify        # typecheck, lint, build, test — what CI runs
-pnpm test          # 1,063 tests, no services required - including a keyless replay of a real Gemini run
+pnpm test          # 1,067 tests, no services required - including a keyless replay of a real Gemini run
 pnpm db:migrate    # creates the five tables in ./adversary.sqlite
 ```
 

@@ -280,3 +280,4 @@ catches.
 | A run whose model never answered was verdicted pass, in both gate states | an invalid API key |
 | The default Gemini model had been retired for new API keys | the rotated credential |
 | Gemini 3 rejects history whose function calls lack their thoughtSignature | the first successful model turn |
+| The agent exploded a parallel tool turn into N invented single-call turns | corpus family A, the batch scenarios |

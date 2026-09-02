@@ -130,7 +130,14 @@ export class AnthropicLlm extends HttpLlm {
       max_tokens: request.maxTokens,
       temperature: request.temperature,
       system: request.system,
-      messages: request.messages.map(toAnthropicMessage),
+      messages: foldToolRuns(request.messages, toAnthropicMessage, (run) => ({
+        role: 'user',
+        content: run.map((message) => ({
+          type: 'tool_result',
+          tool_use_id: message.toolCallId,
+          content: message.content,
+        })),
+      })),
       tools: request.tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
@@ -167,6 +174,39 @@ export class AnthropicLlm extends HttpLlm {
 
     return { text, toolCalls, stopReason: anthropicStop(raw.stop_reason) };
   }
+}
+
+/**
+ * Folds a message list so that a run of consecutive tool results becomes one
+ * entry.
+ *
+ * Anthropic requires every tool_result for a turn in the single user message
+ * that follows it, and Gemini wants parallel functionResponses as parts of one
+ * user turn. The agent emits one `tool` message per result, which is the right
+ * neutral shape - and exactly what OpenAI consumes as-is, which is why the
+ * OpenAI builder does not use this. A group of one serializes identically to
+ * the ungrouped form, so single-call histories are byte-for-byte unchanged.
+ */
+function foldToolRuns<M extends { role: string }, T>(
+  messages: readonly M[],
+  single: (message: M) => T,
+  toolRun: (run: readonly M[]) => T,
+): T[] {
+  const out: T[] = [];
+  for (let i = 0; i < messages.length; i += 1) {
+    const message = messages[i] as M;
+    if (message.role !== 'tool') {
+      out.push(single(message));
+      continue;
+    }
+    const run: M[] = [message];
+    while (i + 1 < messages.length && (messages[i + 1] as M).role === 'tool') {
+      i += 1;
+      run.push(messages[i] as M);
+    }
+    out.push(toolRun(run));
+  }
+  return out;
 }
 
 function toAnthropicMessage(message: {
@@ -369,7 +409,15 @@ export class GeminiLlm extends HttpLlm {
 
     const body = {
       systemInstruction: { parts: [{ text: request.system }] },
-      contents: request.messages.map(toGeminiContent),
+      contents: foldToolRuns(request.messages, toGeminiContent, (run) => ({
+        role: 'user',
+        parts: run.map((message) => ({
+          functionResponse: {
+            name: decodeGeminiCallName(message.toolCallId),
+            response: asObject(message.content),
+          },
+        })),
+      })),
       // An empty `tools` array is rejected, so the key is omitted instead.
       ...(declarations.length > 0 ? { tools: [{ functionDeclarations: declarations }] } : {}),
       generationConfig: {

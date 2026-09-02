@@ -550,3 +550,29 @@ describe('a model failure ends the run as an error', () => {
     ).toBe(true);
   });
 });
+
+describe('parallel tool calls', () => {
+  it('keep one model turn as one history message', async () => {
+    // The exploded form - one invented assistant turn per call - is what broke
+    // Gemini 3 on every batch scenario: it signs only a turn's first call, so
+    // invented turns carried unsigned calls the API refused.
+    const parallel = {
+      text: '',
+      toolCalls: [
+        { id: 'list_invoices#0', name: 'list_invoices', args: {} },
+        { id: 'read_tickets#1', name: 'read_tickets', args: {} },
+      ],
+      stopReason: 'tool_use' as const,
+    };
+    const llm = new ScriptedLlm({ completions: [parallel, says('done')] });
+    const { tools } = recordingTools();
+
+    await createOps({ llm }).run(context(tools));
+
+    const history = llm.requests[1]?.messages ?? [];
+    const assistants = history.filter((m) => m.role === 'assistant');
+    expect(assistants).toHaveLength(1);
+    expect(assistants[0]?.toolCalls).toHaveLength(2);
+    expect(history.filter((m) => m.role === 'tool')).toHaveLength(2);
+  });
+});

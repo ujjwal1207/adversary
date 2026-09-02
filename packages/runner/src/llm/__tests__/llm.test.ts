@@ -817,3 +817,89 @@ describe('Gemini thought signatures', () => {
     expect(sent.contents[1]?.parts[0]).not.toHaveProperty('thoughtSignature');
   });
 });
+
+describe('parallel tool calls survive the round trip', () => {
+  /**
+   * Corpus family A found this: "pay these nine invoices" invites a thinking
+   * model to emit several functionCall parts in one turn, of which Gemini 3
+   * signs only the first. The agent used to explode that turn into N invented
+   * single-call turns, so calls 2..N re-entered history unsigned and the API
+   * refused the whole request - HTTP 400 at "position 6", every batch
+   * scenario, both gate states. The agent now keeps one turn one message, and
+   * these tests pin what each provider is sent for the history
+   *   assistant(list_invoices + pay_vendor) -> two tool results.
+   */
+  const HISTORY = [
+    { role: 'user' as const, content: 'pay everything due' },
+    {
+      role: 'assistant' as const,
+      content: '',
+      toolCalls: [
+        {
+          id: 'list_invoices#0',
+          name: 'list_invoices',
+          args: {},
+          providerData: { thoughtSignature: 'sig_first' },
+        },
+        { id: 'pay_vendor#1', name: 'pay_vendor', args: { vendorId: 'acct_vendor_acme' } },
+      ],
+    },
+    { role: 'tool' as const, content: '[]', toolCallId: 'list_invoices#0' },
+    { role: 'tool' as const, content: '{"ok":true}', toolCallId: 'pay_vendor#1' },
+  ];
+
+  it('Gemini: one model turn, one grouped functionResponse turn, first call signed', async () => {
+    const fetch = fakeFetch({ candidates: [{ content: { parts: [{ text: 'done' }] } }] });
+    await new GeminiLlm({ apiKey: 'k', model: 'gemini-3.6-flash', fetchImpl: fetch }).complete({
+      ...REQUEST,
+      messages: HISTORY,
+    });
+
+    const contents = (fetch.calls[0] as { body: { contents: Record<string, unknown>[] } }).body
+      .contents;
+    expect(contents).toHaveLength(3);
+    const model = contents[1] as { role: string; parts: Record<string, unknown>[] };
+    expect(model.role).toBe('model');
+    expect(model.parts).toHaveLength(2);
+    expect(model.parts[0]).toMatchObject({ thoughtSignature: 'sig_first' });
+    expect(model.parts[1]).not.toHaveProperty('thoughtSignature');
+    const responses = contents[2] as { role: string; parts: unknown[] };
+    expect(responses.role).toBe('user');
+    expect(responses.parts).toHaveLength(2);
+  });
+
+  it('Anthropic: both results ride the single following user turn', async () => {
+    const fetch = fakeFetch({ content: [{ type: 'text', text: 'done' }], stop_reason: 'end_turn' });
+    await new AnthropicLlm({ apiKey: 'k', model: 'm', fetchImpl: fetch }).complete({
+      ...REQUEST,
+      messages: HISTORY,
+    });
+
+    const messages = (fetch.calls[0] as { body: { messages: Record<string, unknown>[] } }).body
+      .messages;
+    expect(messages).toHaveLength(3);
+    const results = messages[2] as { role: string; content: { type: string }[] };
+    expect(results.role).toBe('user');
+    expect(results.content.map((block) => block.type)).toEqual(['tool_result', 'tool_result']);
+  });
+
+  it('OpenAI: flat tool messages are already the native shape', async () => {
+    const fetch = fakeFetch({
+      choices: [{ message: { content: 'done' }, finish_reason: 'stop' }],
+    });
+    await new OpenAiLlm({ apiKey: 'k', model: 'm', fetchImpl: fetch }).complete({
+      ...REQUEST,
+      messages: HISTORY,
+    });
+
+    const messages = (fetch.calls[0] as { body: { messages: { role: string }[] } }).body.messages;
+    // system + user + assistant + two tool messages, ungrouped on purpose.
+    expect(messages.map((message) => message.role)).toEqual([
+      'system',
+      'user',
+      'assistant',
+      'tool',
+      'tool',
+    ]);
+  });
+});

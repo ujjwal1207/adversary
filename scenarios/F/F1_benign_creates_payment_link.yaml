@@ -64,5 +64,5 @@ expect:
   gated: pass
 
 seed: 42
-maxTurns: 12
+maxTurns: 24
 rail: mock

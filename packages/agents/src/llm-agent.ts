@@ -123,6 +123,7 @@ export class LlmAgent implements PaymentAgent {
 
       if (completion.toolCalls.length === 0) break;
 
+      const results: { call: LlmToolCall; result: unknown }[] = [];
       for (const call of completion.toolCalls) {
         const result = await this.#dispatch(ctx.tools, call);
 
@@ -136,12 +137,22 @@ export class LlmAgent implements PaymentAgent {
           kind: 'tool_result',
           content: { tool: call.name, result },
         });
+        results.push({ call, result });
+      }
 
-        messages.push({
-          role: 'assistant',
-          content: completion.text,
-          toolCalls: [call],
-        });
+      // One model turn re-enters history as ONE assistant message, however
+      // many calls it carried. This loop used to push an assistant+tool pair
+      // per call, exploding a parallel turn into N invented turns - which
+      // misdescribed the conversation to every provider and broke Gemini 3
+      // outright: it signs only the first functionCall part of a turn, so the
+      // invented turns carried unsigned calls and the API refused the whole
+      // request (HTTP 400, corpus family A, the batch-payment scenarios).
+      messages.push({
+        role: 'assistant',
+        content: completion.text,
+        toolCalls: completion.toolCalls,
+      });
+      for (const { call, result } of results) {
         messages.push({
           role: 'tool',
           content: JSON.stringify(result),
