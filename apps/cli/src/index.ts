@@ -21,11 +21,13 @@ import { dirname, join, resolve } from 'node:path';
 
 import { Command } from 'commander';
 
-import type { Paise, PaymentAgent, ScenarioFamily } from '@adversary/core';
+import type { Clock, Paise, PaymentAgent, ScenarioFamily } from '@adversary/core';
 import type { ReproducibilityTier } from '@adversary/core';
 import { compareGate, formatPaise, scorecardFor } from '@adversary/core';
 import { createNaiveOps, createOps } from '@adversary/agents';
 import { createGate } from '@adversary/gate';
+import type { Rail } from '@adversary/rails';
+import { LiveTestRail, RestProviderClient, assertTestKey } from '@adversary/rails';
 import { renderReport } from '@adversary/report';
 import type { CassetteLlm, DbHandle, LoadedScenario, ResolvedLlm } from '@adversary/runner';
 import {
@@ -154,16 +156,14 @@ program
   .option('--fresh', 'drop and recreate the database first', false)
   .action(async (target: string | undefined, options: Record<string, unknown>) => {
     const rail = String(options['rail']);
-    if (rail === 'live-test') {
-      // The live rail needs credentials the runner does not construct for
-      // itself, and pointing it at a provider from a convenience flag is
-      // exactly the misconfiguration docs/THREAT-MODEL.md exists to prevent.
-      fail(
-        'The live-test rail is not wired to the CLI yet. It refuses to ' +
-          'construct without a provider TEST key, and this build has never ' +
-          'exercised it against a provider. See docs/LIMITATIONS.md.',
-      );
+    if (rail !== 'mock' && rail !== 'live-test') {
+      fail(`--rail expects mock or live-test; got "${rail}".`);
     }
+    // Constructed before anything else so a refused key stops the run before a
+    // single scenario loads. All the guards live in the rail's own
+    // constructors (fails closed, redacts, no bypass); the CLI only adds
+    // legible errors for credentials that are absent entirely.
+    const liveRail = rail === 'live-test' ? buildLiveRail() : null;
 
     const seed = options['seed'] === undefined ? undefined : Number(options['seed']);
     const scenarios = select(target, options['family'] as string | undefined, options['all'] === true)
@@ -229,7 +229,13 @@ program
             gate: gateOn ? createGate() : null,
             attempt: await nextAttempt(db, runKey),
             model,
-            reproducibility,
+            // A run that touched a real provider is `live` whatever the agent
+            // was: the network is not reproducible, and a scripted agent on
+            // the live rail must not inherit the scripted tier's determinism
+            // claim. verifyDeterminism refuses to compare live runs, and this
+            // is what makes that refusal reach the right rows.
+            reproducibility: liveRail === null ? reproducibility : 'live',
+            ...(liveRail === null ? {} : { rail: liveRail }),
             ...(timeoutMs === undefined ? {} : { wallClockMs: timeoutMs }),
             cassetteHash,
           });
@@ -279,6 +285,86 @@ stored in ${describeConfig(dbConfigFromEnv())}`);
       console.log('run `adversary report` to build a scorecard.');
     });
   });
+
+/**
+ * Constructs the live-test rail from the environment, or explains what is
+ * missing.
+ *
+ * Every guard it relies on lives below this function and cannot be reached
+ * around: `RestProviderClient` and `LiveTestRail` both call `assertTestKey` in
+ * their constructors, which throws on a production-shaped key, throws on an
+ * unrecognised shape (fails closed), and redacts the key in its message. This
+ * function adds nothing but legible errors for the one case the guard cannot
+ * see - credentials that are absent entirely.
+ */
+function buildLiveRail(): Rail {
+  const keyId = process.env['RAZORPAY_KEY_ID']?.trim() ?? '';
+  const keySecret = process.env['RAZORPAY_KEY_SECRET']?.trim() ?? '';
+  const webhookSecret = process.env['RAZORPAY_WEBHOOK_SECRET']?.trim() ?? '';
+
+  if (keyId === '' || keySecret === '') {
+    fail(
+      'The live-test rail needs RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET - ' +
+        'TEST-mode credentials (rzp_test_...), never live ones. Generate them ' +
+        'with the Razorpay dashboard switched to Test Mode, and put them in ' +
+        '.env beside package.json.',
+    );
+  }
+  // The key-shape guard runs BEFORE the webhook-secret check on purpose. A
+  // user holding a production key must hear about the production key first -
+  // it is the refusal that concerns money - not be walked through fixing
+  // lesser configuration around a credential that will never be accepted.
+  try {
+    assertTestKey(keyId, 'key id');
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+
+  if (webhookSecret === '') {
+    fail(
+      'The live-test rail needs RAZORPAY_WEBHOOK_SECRET: an unsigned webhook ' +
+        'endpoint is an open door, so the rail refuses to run without a ' +
+        'secret to verify signatures against.',
+    );
+  }
+
+  try {
+    return new LiveTestRail({
+      keyId,
+      client: new RestProviderClient({ keyId, keySecret }),
+      clock: wallClock(),
+      webhookSecret,
+    });
+  } catch (err) {
+    // ProductionKeyError, already redacted by the guard. The CLI's job here is
+    // exit code 1 and the guard's own words, nothing more.
+    fail(err instanceof Error ? err.message : String(err));
+  }
+}
+
+/**
+ * A real clock for the one rail that is allowed to read one.
+ *
+ * `advance` throws rather than no-ops: the only callers of advance are
+ * deterministic components, and a deterministic component that has been handed
+ * a wall clock is a wiring mistake that must not pass silently.
+ */
+function wallClock(): Clock {
+  return {
+    // The single sanctioned wall-clock read in the project. The live rail is
+    // defined by touching reality - provider-assigned refs, real network, real
+    // time - and its runs carry the `live` tier precisely because of reads
+    // like this one. Everything else takes an injected deterministic Clock,
+    // and the lint rule stays on to keep it that way.
+    // eslint-disable-next-line no-restricted-properties
+    now: () => Date.now(),
+    advance: () => {
+      throw new Error(
+        "A wall clock cannot be advanced. A deterministic component was handed the live rail's clock.",
+      );
+    },
+  };
+}
 
 function printReplayHint(cassette: CassetteLlm, hash: string): void {
   console.log(`

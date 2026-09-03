@@ -281,3 +281,4 @@ catches.
 | The default Gemini model had been retired for new API keys | the rotated credential |
 | Gemini 3 rejects history whose function calls lack their thoughtSignature | the first successful model turn |
 | The agent exploded a parallel tool turn into N invented single-call turns | corpus family A, the batch scenarios |
+| A19 closed: the live rail ran against Razorpay test mode and was answered with a real `plink_` ref | one webhook secret after the guards passed |

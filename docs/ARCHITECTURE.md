@@ -1619,6 +1619,28 @@ Node's own `--env-file` was the obvious alternative and was rejected: it throws
 when the file is absent, and the default path for this project is that there is
 no file and no credentials at all.
 
+### A28 — The live rail, wired and proven (closes A19)
+
+2026-09-03: `adversary run --rail live-test` constructs `LiveTestRail` over
+`RestProviderClient` from `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`/
+`RAZORPAY_WEBHOOK_SECRET`, and the first run against Razorpay's real test mode
+executed corpus F1 end to end: one payment link, gate-approved, ledgered, and
+answered by the provider with its own reference (`plink_…`) — recorded with
+rail `live-test` and reproducibility `live`, never `scripted`, whatever agent
+ran (the CLI forces the tier down, because a scripted agent on a real network
+must not inherit a determinism claim).
+
+The guards were demonstrated before the wire was connected, in the order that
+matters: a production-shaped key is refused first — redacted, exit 1 — before
+any lesser configuration advice; an unrecognised shape fails closed; absent
+credentials are named; a missing webhook secret refuses the run, because an
+unsigned webhook endpoint is an open door. Four subprocess tests hold the
+shipped command line to each refusal, including that the refusal itself never
+prints the credential it refused. The CLI carries the project's single
+sanctioned `Date.now` — the live rail is defined by touching reality — behind
+a lint exception annotated at the call site, with the rule left on for
+everything else.
+
 ### A27 — The full corpus, recorded and replayable
 
 2026-09-03: all 62 scenarios ran against gemini-3.6-flash, both gate states —
@@ -1791,7 +1813,7 @@ finding rather than a defect.
 No shipped number moved. Scripted runs do not call the new tools, which is
 precisely why nothing caught this.
 
-### A19 — `--rail live-test` is refused by the CLI, not wired to it (deviation)
+### A19 — `--rail live-test` is refused by the CLI, not wired to it (deviation — CLOSED by A28)
 
 **Spec:** `adversary run ... [--rail mock|live-test]`.
 
