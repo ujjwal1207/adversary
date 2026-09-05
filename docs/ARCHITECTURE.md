@@ -7,7 +7,7 @@
 > [§17 Deviations and additions](#17-deviations-and-additions) — nothing is changed
 > silently.
 
-**Status:** design complete, implementation not started (Phase 0 of 12).
+**Status:** complete. All twelve phases implemented, 1,073 tests, and every reproducibility tier exercised against reality at least once — the corpus run three ways in CI, a full real-model evaluation recorded and replayed keylessly, and the live rail answered by a payment provider's sandbox. The twenty-eight deviations below record where the implementation departed from this contract, and why; seven of them were found by connecting a real model to code that already had a green test suite.
 
 ---
 
