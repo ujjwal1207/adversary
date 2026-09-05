@@ -6,8 +6,11 @@ coverage/
 .env.local
 *.sqlite
 *.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
 *.db
 out/
 report.html
+report.json
 .cassettes/
 apps/dashboard/public/snapshot.json
