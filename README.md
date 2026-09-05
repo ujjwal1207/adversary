@@ -1,5 +1,8 @@
 # Adversary
 
+[![CI](https://github.com/ujjwal1207/adversary/actions/workflows/ci.yml/badge.svg)](https://github.com/ujjwal1207/adversary/actions/workflows/ci.yml)
+[![Licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue.svg)](LICENSE)
+
 An evaluation and red-team harness for AI agents that have payment authority.
 
 Point it at a payment agent. It runs a corpus of adversarial and benign
