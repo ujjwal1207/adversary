@@ -12,5 +12,6 @@ coverage/
 out/
 report.html
 report.json
+architecture.html
 .cassettes/
 apps/dashboard/public/snapshot.json
